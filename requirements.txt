@@ -1,0 +1,41 @@
+# Core dependencies
+streamlit>=1.28.0
+pandas>=2.0.0
+numpy>=1.24.0
+python-dotenv>=1.0.0
+
+# Vector search and embeddings
+sentence-transformers>=2.2.2
+pinecone>=3.0.0
+# Alternative: weaviate-client>=3.25.0
+
+# Text processing
+langchain>=0.1.0
+tiktoken>=0.5.0
+rank-bm25>=0.2.2
+
+# Document processing
+pypdf2>=3.0.0
+python-dateutil>=2.8.2
+reportlab>=4.0.0
+
+# Logging and monitoring
+loguru>=0.7.0
+
+# Data storage
+sqlalchemy>=2.0.0
+psycopg2-binary>=2.9.0
+
+# API and async
+httpx>=0.24.0
+asyncio>=3.4.3
+
+# Progress bars
+tqdm>=4.65.0
+
+# Caching
+diskcache>=5.6.0
+
+# AI/LLM Integration
+google-generativeai>=0.3.0
+openai>=1.0.0

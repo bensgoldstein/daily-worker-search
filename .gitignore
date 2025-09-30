@@ -1,0 +1,38 @@
+# Sensitive files - NEVER commit these!
+.env
+.streamlit/secrets.toml
+secrets.toml
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Project specific
+*.log
+processed_data/
+*.pkl
+*.pickle
+nul
+
+# Large files
+*.jpg
+*.jpeg
+*.png
+*.pdf
+ilovepdf_pages-to-jpg/
