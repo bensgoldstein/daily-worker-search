@@ -138,6 +138,28 @@ def make_source_references_clickable_for_pdf(ai_response: str, search_results: L
     return result
 
 
+def make_source_references_clickable_for_pdf(text: str, search_results: List[SearchResult]) -> str:
+    """Replace [Source N] with clickable links in PDF format."""
+    import re
+    
+    def replace_source(match):
+        source_num = int(match.group(1))
+        if 1 <= source_num <= len(search_results):
+            result = search_results[source_num - 1]
+            # Get the Internet Archive URL
+            source_url = result.chunk.newspaper_metadata.source_url
+            if not source_url:
+                source_url = reconstruct_internet_archive_url(result)
+            
+            if source_url:
+                # Return a clickable link for PDF
+                return f'<link href="{source_url}" color="blue">[Source {source_num}]</link>'
+        return match.group(0)
+    
+    # Replace [Source N] with clickable links
+    return re.sub(r'\[Source (\d+)\]', replace_source, text)
+
+
 def parse_ai_response_for_pdf(ai_response: str, styles, search_results: List[SearchResult] = None):
     """Parse AI response and convert to properly formatted PDF elements."""
     elements = []
