@@ -807,18 +807,42 @@ def reconstruct_internet_archive_url(result: SearchResult) -> Optional[str]:
             return None
         
         # Parse volume and issue from section field
-        if not meta.section:
-            logger.warning(f"No section metadata for URL reconstruction: {meta.newspaper_name} {meta.publication_date}")
-            return None
+        volume = None
+        issue = None
         
-        # Extract volume and issue from patterns like "Volume 2, Issue 70"
-        volume_issue_match = re.match(r'Volume (\d+), Issue (\d+)', meta.section)
-        if not volume_issue_match:
-            logger.warning(f"Could not parse volume/issue from section: '{meta.section}' for {meta.newspaper_name} {meta.publication_date}")
-            return None
+        if meta.section and meta.section != "Unknown":
+            # Extract volume and issue from patterns like "Volume 2, Issue 70"
+            volume_issue_match = re.match(r'Volume (\d+), Issue (\d+)', meta.section)
+            if volume_issue_match:
+                volume = volume_issue_match.group(1)
+                issue = volume_issue_match.group(2)
         
-        volume = volume_issue_match.group(1)
-        issue = volume_issue_match.group(2)
+        # If we couldn't get volume/issue from section, try to construct a simpler URL
+        # Many Internet Archive Daily Worker items use just the date pattern
+        if not volume or not issue:
+            logger.debug(f"Using date-only pattern for URL reconstruction: {meta.newspaper_name} {meta.publication_date}")
+            # Fallback to date-only pattern - let's try to construct a basic URL
+            date_str = meta.publication_date.strftime('%Y-%m-%d')
+            year = meta.publication_date.year
+            
+            # Try common patterns for Daily Worker based on date
+            if year < 1930:
+                # Try the-daily-worker pattern
+                possible_ids = [
+                    f"per_daily-worker_the-daily-worker_{date_str}",
+                    f"the-daily-worker_{date_str}"
+                ]
+            else:
+                # Try daily-worker pattern  
+                possible_ids = [
+                    f"per_daily-worker_daily-worker_{date_str}",
+                    f"daily-worker_{date_str}"
+                ]
+            
+            # Return the first pattern as a best guess
+            url = f"https://archive.org/details/{possible_ids[0]}"
+            logger.debug(f"Fallback URL (no volume/issue): {url}")
+            return url
         
         # Format the date as YYYY-MM-DD
         date_str = meta.publication_date.strftime('%Y-%m-%d')
@@ -1105,10 +1129,15 @@ def main():
             img_base64 = base64.b64encode(img_file.read()).decode()
         masthead_img_src = f"data:image/jpeg;base64,{img_base64}"
     else:
-        # Use Google Drive hosted image for cloud deployment
-        # Direct image URL from Google Drive with proper format for display
+        # Use fallback approach for cloud deployment - try multiple methods
+        # Method 1: Google Drive direct link (may require public sharing)
         gdrive_file_id = "1aFE1IZ9Z3EHs5TTZ8CTJv5vFpWpOU1On"
-        masthead_img_src = f"https://drive.google.com/uc?export=download&id={gdrive_file_id}"
+        
+        # Try the thumbnail view which is more reliable for public images
+        masthead_img_src = f"https://drive.google.com/thumbnail?id={gdrive_file_id}&sz=w400"
+        
+        # Alternative: Use a base64 encoded placeholder or external hosting
+        # If Google Drive fails, we could fallback to a simple text header
     
     st.markdown(f"""
     <div class="main-header">
@@ -1121,7 +1150,13 @@ def main():
                 <img src="{masthead_img_src}" 
                      alt="Daily Worker Masthead from January 1, 1935" 
                      style="max-height: 120px; width: auto; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.2); 
-                            object-fit: contain; object-position: top;">
+                            object-fit: contain; object-position: top;"
+                     onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+                <div style="display: none; background: rgba(255,255,255,0.1); padding: 1rem; border-radius: 8px; 
+                           text-align: center; color: #ffffff; border: 2px solid rgba(255,255,255,0.3);">
+                    <strong>Daily Worker</strong><br>
+                    <small>January 1, 1935</small>
+                </div>
             </div>
         </div>
     </div>
