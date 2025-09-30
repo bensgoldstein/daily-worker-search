@@ -77,36 +77,31 @@ from pathlib import Path
 masthead_path = Path(__file__).parent.parent / "ilovepdf_pages-to-jpg" / "per_daily-worker_daily-worker_1935-01-01_12_1_page-0001.jpg"
 
 if masthead_path.exists():
-    # Read and encode the image
+    # Read and encode the local image
     with open(masthead_path, "rb") as img_file:
         img_base64 = base64.b64encode(img_file.read()).decode()
-    
-    st.markdown(f"""
-    <div class="main-header">
-        <div style="display: flex; align-items: center; justify-content: center; gap: 2rem; flex-wrap: wrap;">
-            <div style="flex: 1; text-align: center; min-width: 300px;">
-                <h1>How to Use the AI-powered Daily Worker Search</h1>
-                <p>Complete guide to searching the CPUSA's Daily Worker archive</p>
-            </div>
-            <div style="flex: 0 0 auto;">
-                <img src="data:image/jpeg;base64,{img_base64}" 
-                     alt="Daily Worker Masthead from January 1, 1935" 
-                     style="max-height: 120px; width: auto; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.2); 
-                            object-fit: contain; object-position: top;">
-            </div>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
+    masthead_img_src = f"data:image/jpeg;base64,{img_base64}"
 else:
-    # Fallback if image not found
-    st.markdown("""
-    <div class="main-header">
-        <div style="text-align: center;">
+    # Use Google Drive hosted image for cloud deployment
+    gdrive_file_id = "1aFE1IZ9Z3EHs5TTZ8CTJv5vFpWpOU1On"
+    masthead_img_src = f"https://drive.google.com/uc?export=view&id={gdrive_file_id}"
+
+st.markdown(f"""
+<div class="main-header">
+    <div style="display: flex; align-items: center; justify-content: center; gap: 2rem; flex-wrap: wrap;">
+        <div style="flex: 1; text-align: center; min-width: 300px;">
             <h1>How to Use the AI-powered Daily Worker Search</h1>
             <p>Complete guide to searching the CPUSA's Daily Worker archive</p>
         </div>
+        <div style="flex: 0 0 auto;">
+            <img src="{masthead_img_src}" 
+                 alt="Daily Worker Masthead from January 1, 1935" 
+                 style="max-height: 120px; width: auto; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.2); 
+                        object-fit: contain; object-position: top;">
+        </div>
     </div>
-    """, unsafe_allow_html=True)
+</div>
+""", unsafe_allow_html=True)
 
 # Getting Started
 st.markdown("""

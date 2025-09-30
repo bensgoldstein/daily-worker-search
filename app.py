@@ -28,6 +28,8 @@ from datetime import datetime
 import base64
 from auth import AuthManager
 from usage_monitor import UsageMonitor
+import requests
+import gdown
 
 # Try to import PDF generation libraries
 try:
@@ -798,6 +800,33 @@ def reconstruct_internet_archive_url(result: SearchResult) -> Optional[str]:
         return None
 
 
+def download_bm25_index(bm25_path: Path) -> bool:
+    """Download BM25 index from Google Drive if not present."""
+    if bm25_path.exists():
+        return True
+    
+    # Google Drive file ID from the sharing link
+    file_id = "1ujeMPLPFYhIMT8xei2ZcApcNvo-gZL-A"
+    url = f"https://drive.google.com/uc?id={file_id}"
+    
+    try:
+        # Create directory if it doesn't exist
+        bm25_path.parent.mkdir(parents=True, exist_ok=True)
+        
+        with st.spinner("Downloading BM25 index (1.5GB) for keyword search capability... This is a one-time download."):
+            # Use gdown to handle Google Drive downloads
+            import gdown
+            gdown.download(url, str(bm25_path), quiet=False)
+            
+        st.success("BM25 index downloaded successfully!")
+        return True
+        
+    except Exception as e:
+        st.warning(f"Could not download BM25 index: {e}. Continuing without keyword search.")
+        logger.error(f"BM25 download error: {e}")
+        return False
+
+
 @st.cache_resource
 def initialize_vector_db():
     """Initialize vector database connection."""
@@ -814,7 +843,11 @@ def initialize_vector_db():
         bm25_path = script_dir / "processed_data" / "bm25_index_hosted.pkl"
         
         logger.info(f"Looking for BM25 index at: {bm25_path}")
-        logger.info(f"BM25 index exists: {bm25_path.exists()}")
+        
+        # Try to download if not present
+        if not bm25_path.exists():
+            logger.info("BM25 index not found locally, attempting to download...")
+            download_bm25_index(bm25_path)
         
         if bm25_path.exists():
             try:
@@ -839,6 +872,8 @@ def initialize_vector_db():
 
 def format_search_result(result: SearchResult, index: int) -> str:
     """Format a search result for display."""
+    import html
+    
     citation = result.format_citation()
     score_percent = int(result.relevance_score * 100)
     
@@ -852,6 +887,11 @@ def format_search_result(result: SearchResult, index: int) -> str:
     if source_url:
         source_link = f' <a href="{source_url}" target="_blank" style="color: #0066cc; text-decoration: none;">[View Source]</a>'
     
+    # Clean up the content by unescaping HTML entities and removing any stray HTML tags
+    clean_content = html.unescape(result.chunk.content)
+    # Remove any remaining HTML tags that shouldn't be there
+    clean_content = re.sub(r'<[^>]+>', '', clean_content)
+    
     return f"""
     <div class="search-result">
         <div class="result-header">
@@ -860,7 +900,7 @@ def format_search_result(result: SearchResult, index: int) -> str:
             {source_link}
         </div>
         <div class="result-citation">{citation}</div>
-        <div class="result-content">{result.chunk.content}</div>
+        <div class="result-content">{clean_content}</div>
     </div>
     """
 
@@ -1001,40 +1041,36 @@ def main():
     initialize_conversation_state()
     
     # Header with Daily Worker masthead
-    # Get the masthead image path
+    # Try local path first, then use Google Drive URL
     masthead_path = Path(__file__).parent / "ilovepdf_pages-to-jpg" / "per_daily-worker_daily-worker_1935-01-01_12_1_page-0001.jpg"
     
     if masthead_path.exists():
-        # Read and encode the image
+        # Read and encode the local image
         with open(masthead_path, "rb") as img_file:
             img_base64 = base64.b64encode(img_file.read()).decode()
-        
-        st.markdown(f"""
-        <div class="main-header">
-            <div style="display: flex; align-items: center; justify-content: center; gap: 2rem; flex-wrap: wrap;">
-                <div style="flex: 1; text-align: center; min-width: 300px;">
-                    <h1>AI-powered Daily Worker (1924-58) Search Database</h1>
-                    <p>Query across the CPUSA's Daily Worker, as preserved on <a href="https://archive.org/details/pub_daily-worker?and%5B%5D=year%3A%5B1934+TO+1936%5D" target="_blank" style="color: #ffffff; text-decoration: underline;">Internet Archive</a></p>
-                </div>
-                <div style="flex: 0 0 auto;">
-                    <img src="data:image/jpeg;base64,{img_base64}" 
-                         alt="Daily Worker Masthead from January 1, 1935" 
-                         style="max-height: 120px; width: auto; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.2); 
-                                object-fit: contain; object-position: top;">
-                </div>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
+        masthead_img_src = f"data:image/jpeg;base64,{img_base64}"
     else:
-        # Fallback if image not found
-        st.markdown("""
-        <div class="main-header">
-            <div style="text-align: center;">
+        # Use Google Drive hosted image for cloud deployment
+        # Direct image URL from Google Drive
+        gdrive_file_id = "1aFE1IZ9Z3EHs5TTZ8CTJv5vFpWpOU1On"
+        masthead_img_src = f"https://drive.google.com/uc?export=view&id={gdrive_file_id}"
+    
+    st.markdown(f"""
+    <div class="main-header">
+        <div style="display: flex; align-items: center; justify-content: center; gap: 2rem; flex-wrap: wrap;">
+            <div style="flex: 1; text-align: center; min-width: 300px;">
                 <h1>AI-powered Daily Worker (1924-58) Search Database</h1>
                 <p>Query across the CPUSA's Daily Worker, as preserved on <a href="https://archive.org/details/pub_daily-worker?and%5B%5D=year%3A%5B1934+TO+1936%5D" target="_blank" style="color: #ffffff; text-decoration: underline;">Internet Archive</a></p>
             </div>
+            <div style="flex: 0 0 auto;">
+                <img src="{masthead_img_src}" 
+                     alt="Daily Worker Masthead from January 1, 1935" 
+                     style="max-height: 120px; width: auto; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.2); 
+                            object-fit: contain; object-position: top;">
+            </div>
         </div>
-        """, unsafe_allow_html=True)
+    </div>
+    """, unsafe_allow_html=True)
     
     # Quick navigation info
     st.info("**New to the system?** Check the 'How to Use' page in the sidebar for search tips and examples.")
