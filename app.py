@@ -825,19 +825,11 @@ def reconstruct_internet_archive_url(result: SearchResult) -> Optional[str]:
             date_str = meta.publication_date.strftime('%Y-%m-%d')
             year = meta.publication_date.year
             
-            # Try common patterns for Daily Worker based on date
-            if year < 1930:
-                # Try the-daily-worker pattern
-                possible_ids = [
-                    f"per_daily-worker_the-daily-worker_{date_str}",
-                    f"the-daily-worker_{date_str}"
-                ]
-            else:
-                # Try daily-worker pattern  
-                possible_ids = [
-                    f"per_daily-worker_daily-worker_{date_str}",
-                    f"daily-worker_{date_str}"
-                ]
+            # Try the simplified pattern without redundant newspaper name
+            possible_ids = [
+                f"per_daily-worker_{date_str}",
+                f"daily-worker_{date_str}"
+            ]
             
             # Return the first pattern as a best guess
             url = f"https://archive.org/details/{possible_ids[0]}"
@@ -851,13 +843,9 @@ def reconstruct_internet_archive_url(result: SearchResult) -> Optional[str]:
         # Earlier Daily Worker issues (before ~1930) use "the-daily-worker" pattern
         year = meta.publication_date.year
         
-        if "The Worker" in meta.newspaper_name and "Daily" not in meta.newspaper_name:
-            # "The Worker" (without "Daily")
-            archive_id = f"per_daily-worker_the-worker_{date_str}_{volume}_{issue}"
-        elif year < 1930:  # Earlier Daily Worker issues
-            archive_id = f"per_daily-worker_the-daily-worker_{date_str}_{volume}_{issue}"
-        else:  # Later Daily Worker issues
-            archive_id = f"per_daily-worker_daily-worker_{date_str}_{volume}_{issue}"
+        # The correct pattern is simply: per_daily-worker_{date}_{volume}_{issue}
+        # No need to add the newspaper name again
+        archive_id = f"per_daily-worker_{date_str}_{volume}_{issue}"
         
         url = f"https://archive.org/details/{archive_id}"
         logger.debug(f"Reconstructed URL: {url} for {meta.newspaper_name} {meta.publication_date}")
