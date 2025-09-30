@@ -4,8 +4,31 @@ import os
 from typing import Optional
 from dotenv import load_dotenv
 
+# Try to import streamlit for secrets
+try:
+    import streamlit as st
+    HAS_STREAMLIT = True
+except ImportError:
+    HAS_STREAMLIT = False
+
 # Load environment variables
 load_dotenv()
+
+def get_config_value(key: str, default: Optional[str] = None) -> Optional[str]:
+    """Get config value from environment or Streamlit secrets."""
+    # First try environment variable
+    value = os.getenv(key)
+    if value:
+        return value
+    
+    # Then try Streamlit secrets if available
+    if HAS_STREAMLIT and hasattr(st, 'secrets'):
+        try:
+            return st.secrets.get(key, default)
+        except:
+            pass
+    
+    return default
 
 class Config:
     """System configuration."""
@@ -15,10 +38,10 @@ class Config:
     APP_VERSION = "1.0.0"
     
     # Vector database settings
-    VECTOR_DB_PROVIDER = os.getenv("VECTOR_DB_PROVIDER", "pinecone")  # pinecone or weaviate
-    PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
-    PINECONE_ENVIRONMENT = os.getenv("PINECONE_ENVIRONMENT", "gcp-starter")
-    PINECONE_INDEX_NAME = os.getenv("PINECONE_INDEX_NAME", "newspaper-rag")
+    VECTOR_DB_PROVIDER = get_config_value("VECTOR_DB_PROVIDER", "pinecone")  # pinecone or weaviate
+    PINECONE_API_KEY = get_config_value("PINECONE_API_KEY")
+    PINECONE_ENVIRONMENT = get_config_value("PINECONE_ENVIRONMENT", "gcp-starter")
+    PINECONE_INDEX_NAME = get_config_value("PINECONE_INDEX_NAME", "newspaper-rag")
     
     # Embedding settings
     EMBEDDING_MODEL = "multilingual-e5-large"  # Pinecone-hosted
@@ -34,9 +57,9 @@ class Config:
     BM25_WEIGHT = 0.3  # Weight for BM25 in hybrid search
     
     # LLM settings (for response generation)
-    OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-    GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-    LLM_PROVIDER = os.getenv("LLM_PROVIDER", "gemini")  # gemini or openai
+    OPENAI_API_KEY = get_config_value("OPENAI_API_KEY")
+    GEMINI_API_KEY = get_config_value("GEMINI_API_KEY")
+    LLM_PROVIDER = get_config_value("LLM_PROVIDER", "gemini")  # gemini or openai
     
     # Model settings based on provider
     if LLM_PROVIDER == "gemini":
@@ -49,7 +72,7 @@ class Config:
         LLM_MAX_TOKENS = 1500
     
     # Database settings (for metadata storage)
-    DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///newspaper_metadata.db")
+    DATABASE_URL = get_config_value("DATABASE_URL", "sqlite:///newspaper_metadata.db")
     
     # Processing settings
     BATCH_SIZE = 100
@@ -60,7 +83,7 @@ class Config:
     MAX_DATE_RANGE_DAYS = 36500  # 100 years
     
     # Logging
-    LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
+    LOG_LEVEL = get_config_value("LOG_LEVEL", "INFO")
     LOG_FILE = "newspaper_rag.log"
     
     @classmethod

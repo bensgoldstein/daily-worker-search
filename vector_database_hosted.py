@@ -14,6 +14,7 @@ import numpy as np
 from rank_bm25 import BM25Okapi
 
 from models import DocumentChunk, SearchQuery, SearchResult, NewspaperMetadata
+from config import config, get_config_value
 
 
 class VectorDatabaseHosted:
@@ -22,11 +23,15 @@ class VectorDatabaseHosted:
     def __init__(self):
         """Initialize Pinecone connection."""
         # Initialize Pinecone
-        self.pc = Pinecone(api_key=os.getenv("PINECONE_API_KEY"))
-        self.index_name = os.getenv("PINECONE_INDEX_NAME", "newspaper-rag")
+        self.pc = Pinecone(api_key=config.PINECONE_API_KEY)
+        self.index_name = config.PINECONE_INDEX_NAME
         
-        # Connect to index
-        self.index = self.pc.Index(self.index_name)
+        # Connect to index - use host if provided
+        pinecone_host = get_config_value("PINECONE_HOST")
+        if pinecone_host:
+            self.index = self.pc.Index(self.index_name, host=pinecone_host)
+        else:
+            self.index = self.pc.Index(self.index_name)
         
         # Get index stats
         stats = self.index.describe_index_stats()
