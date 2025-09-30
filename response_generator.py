@@ -91,7 +91,8 @@ class ResponseGenerator:
         """Get the system prompt for the LLM."""
         return """You are a helpful historical research assistant specializing in newspaper archives. 
 Your role is to synthesize information from historical newspaper articles to answer questions accurately.
-Always cite your sources using the provided source numbers.
+Always cite your sources using the provided source numbers in the format [Source N] where N is a single number.
+NEVER use multiple source numbers in one citation (like [Source 1, 2, 3]).
 Focus on factual information and historical context.
 If information is unclear or contradictory between sources, acknowledge this."""
     
@@ -106,8 +107,13 @@ Please provide a comprehensive answer that:
 1. Directly addresses the question
 2. Synthesizes information from multiple sources
 3. Includes specific dates, names, and events mentioned
-4. Cites sources using [Source N] format
+4. Cites sources using [Source N] format - IMPORTANT: Use only ONE source number per citation (e.g., [Source 1], [Source 2], not [Source 1, 2, 3])
 5. Provides historical context when relevant
+
+CITATION FORMAT RULES:
+- Each citation must contain only ONE source number: [Source 1], [Source 2], etc.
+- Never combine multiple sources in a single citation like [Source 1, 2, 3]
+- If multiple sources support the same point, cite them separately: [Source 1] [Source 2] [Source 3]
 
 If the sources don't contain enough information to fully answer the question, acknowledge this and explain what information is available."""
     
