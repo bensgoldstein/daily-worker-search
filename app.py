@@ -211,6 +211,12 @@ def parse_ai_response_for_pdf(ai_response: str, styles, search_results: List[Sea
                 current_paragraph = []
             
             heading_text = line.replace('##', '').strip()
+            # Clean HTML entities and tags
+            import html
+            import re
+            heading_text = html.unescape(heading_text)
+            heading_text = re.sub(r'<[^>]+>', '', heading_text)
+            heading_text = re.sub(r'[<>&]', '', heading_text)
             elements.append(Paragraph(heading_text, ai_heading_style))
             
         elif line.startswith('###'):
@@ -221,6 +227,12 @@ def parse_ai_response_for_pdf(ai_response: str, styles, search_results: List[Sea
                 current_paragraph = []
             
             subheading_text = line.replace('###', '').strip()
+            # Clean HTML entities and tags
+            import html
+            import re
+            subheading_text = html.unescape(subheading_text)
+            subheading_text = re.sub(r'<[^>]+>', '', subheading_text)
+            subheading_text = re.sub(r'[<>&]', '', subheading_text)
             elements.append(Paragraph(subheading_text, ai_subheading_style))
             
         elif line.startswith('**') and line.endswith('**') and len(line) > 4:
@@ -231,6 +243,12 @@ def parse_ai_response_for_pdf(ai_response: str, styles, search_results: List[Sea
                 current_paragraph = []
             
             bold_text = line.replace('**', '').strip()
+            # Clean HTML entities and tags
+            import html
+            import re
+            bold_text = html.unescape(bold_text)
+            bold_text = re.sub(r'<[^>]+>', '', bold_text)
+            bold_text = re.sub(r'[<>&]', '', bold_text)
             elements.append(Paragraph(f"<b>{bold_text}</b>", ai_subheading_style))
             
         elif line.startswith('- ') or line.startswith('• '):
@@ -241,8 +259,13 @@ def parse_ai_response_for_pdf(ai_response: str, styles, search_results: List[Sea
                 current_paragraph = []
             
             bullet_text = line.replace('- ', '').replace('• ', '').strip()
-            # Clean up any remaining markdown
+            # Clean up any remaining markdown and HTML
+            import html
+            import re
             bullet_text = bullet_text.replace('**', '')
+            bullet_text = html.unescape(bullet_text)
+            bullet_text = re.sub(r'<[^>]+>', '', bullet_text)
+            bullet_text = re.sub(r'[<>&]', '', bullet_text)
             elements.append(Paragraph(f"• {bullet_text}", ai_bullet_style))
             
         elif line.startswith('*') and not line.startswith('**'):
@@ -253,12 +276,25 @@ def parse_ai_response_for_pdf(ai_response: str, styles, search_results: List[Sea
                 current_paragraph = []
             
             bullet_text = line.replace('*', '').strip()
+            # Clean HTML entities and tags
+            import html
+            import re
+            bullet_text = html.unescape(bullet_text)
+            bullet_text = re.sub(r'<[^>]+>', '', bullet_text)
+            bullet_text = re.sub(r'[<>&]', '', bullet_text)
             elements.append(Paragraph(f"• {bullet_text}", ai_bullet_style))
             
         else:
             # Regular text - accumulate into paragraph
-            # Clean up markdown formatting
+            # Clean up markdown formatting and HTML
+            import html
+            import re
             clean_line = line.replace('**', '').replace('*', '')
+            # Clean HTML entities and tags
+            clean_line = html.unescape(clean_line)
+            clean_line = re.sub(r'<[^>]+>', '', clean_line)
+            # Remove problematic characters
+            clean_line = re.sub(r'[<>&]', '', clean_line)
             current_paragraph.append(clean_line)
     
     # Add any remaining paragraph
@@ -692,12 +728,21 @@ def generate_pdf_report(query_text: str, search_query: SearchQuery, results: Lis
             content.append(Paragraph(f"<b>Source:</b> <link href='{source_url}'>{source_url}</link>", styles['Normal']))
         
         # Content
-        # Limit content length for PDF
+        # Limit content length for PDF and clean HTML
         content_text = result.chunk.content
         if len(content_text) > 1000:
             content_text = content_text[:1000] + "..."
         
-        content.append(Paragraph(f"<b>Content:</b> {content_text}", styles['Normal']))
+        # Clean HTML tags and entities for PDF
+        import html
+        import re
+        clean_content = html.unescape(content_text)
+        # Remove HTML tags
+        clean_content = re.sub(r'<[^>]+>', '', clean_content)
+        # Remove problematic characters that could interfere with ReportLab
+        clean_content = re.sub(r'[<>&]', '', clean_content)
+        
+        content.append(Paragraph(f"<b>Content:</b> {clean_content}", styles['Normal']))
         content.append(Spacer(1, 15))
     
     # Footer
@@ -1061,9 +1106,9 @@ def main():
         masthead_img_src = f"data:image/jpeg;base64,{img_base64}"
     else:
         # Use Google Drive hosted image for cloud deployment
-        # Direct image URL from Google Drive
+        # Direct image URL from Google Drive with proper format for display
         gdrive_file_id = "1aFE1IZ9Z3EHs5TTZ8CTJv5vFpWpOU1On"
-        masthead_img_src = f"https://drive.google.com/uc?export=view&id={gdrive_file_id}"
+        masthead_img_src = f"https://drive.google.com/uc?export=download&id={gdrive_file_id}"
     
     st.markdown(f"""
     <div class="main-header">
