@@ -844,25 +844,35 @@ def initialize_vector_db():
         
         logger.info(f"Looking for BM25 index at: {bm25_path}")
         
-        # Try to download if not present
-        if not bm25_path.exists():
+        # Skip BM25 download on cloud deployment due to memory constraints
+        # Try to download if not present and we're not on Streamlit Cloud
+        is_cloud_deployment = os.getenv('STREAMLIT_SHARING_MODE') or '/mount/src/' in str(bm25_path)
+        
+        if not bm25_path.exists() and not is_cloud_deployment:
             logger.info("BM25 index not found locally, attempting to download...")
             download_bm25_index(bm25_path)
+        elif is_cloud_deployment:
+            logger.info("Cloud deployment detected - skipping BM25 download due to memory constraints")
         
         if bm25_path.exists():
             try:
                 logger.info(f"Loading BM25 index from: {bm25_path}")
-                vector_db.load_bm25_index(str(bm25_path))
-                st.success("Connected to Pinecone with over 30 years-worth of Daily Worker and the Worker history")
+                # Show loading message to user
+                with st.spinner("Loading BM25 index for keyword search (this may take a moment)..."):
+                    vector_db.load_bm25_index(str(bm25_path))
+                st.success("Connected to Pinecone with full search capabilities including BM25 keyword search")
                 logger.info("BM25 index loaded successfully")
+            except MemoryError as e:
+                st.warning("BM25 index too large for available memory. Continuing with semantic search only.")
+                logger.error(f"Memory error loading BM25 index: {e}")
             except Exception as e:
-                st.warning(f"Failed to load BM25 index: {e}")
+                st.warning(f"Failed to load BM25 index: {e}. Continuing with semantic search only.")
                 logger.error(f"BM25 index loading error: {e}")
                 import traceback
                 logger.error(f"Traceback: {traceback.format_exc()}")
         else:
-            st.warning(f"BM25 index not found at: {bm25_path}")
-            logger.warning(f"BM25 index file not found at: {bm25_path}")
+            st.info("BM25 index not available. Using semantic search only.")
+            logger.info(f"BM25 index file not found at: {bm25_path}")
         
         return vector_db
     except Exception as e:
@@ -1119,14 +1129,29 @@ def main():
         
         # Search type
         st.subheader("Search Type")
-        search_type = st.radio(
-            "Select search method",
-            ["Hybrid (Recommended)", "Semantic", "Keyword"],
-            help="""
+        
+        # Check if BM25 is available
+        bm25_available = hasattr(vector_db, 'bm25') and vector_db.bm25 is not None
+        
+        if bm25_available:
+            search_options = ["Hybrid (Recommended)", "Semantic", "Keyword"]
+            help_text = """
             - **Hybrid**: Combines semantic understanding with keyword matching
             - **Semantic**: Finds conceptually similar content
             - **Keyword**: Traditional keyword-based search
             """
+        else:
+            search_options = ["Semantic (Recommended)"]
+            help_text = """
+            - **Semantic**: Finds conceptually similar content using AI embeddings
+            
+            Note: Keyword search temporarily unavailable in cloud deployment due to memory constraints.
+            """
+        
+        search_type = st.radio(
+            "Select search method",
+            search_options,
+            help=help_text
         )
         
         # Advanced options
@@ -1260,6 +1285,7 @@ def main():
             search_type_map = {
                 "Hybrid (Recommended)": "hybrid",
                 "Semantic": "semantic",
+                "Semantic (Recommended)": "semantic",
                 "Keyword": "keyword"
             }
             
