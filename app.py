@@ -1102,7 +1102,12 @@ def safe_pdf_download_button(usage_monitor: UsageMonitor, **kwargs) -> bool:
 def get_surrounding_chunks(vector_db, result: SearchResult, num_before: int = 2, num_after: int = 2) -> Dict[str, Any]:
     """Get chunks before and after the main chunk for context."""
     meta = result.chunk.newspaper_metadata
-    main_chunk_index = result.chunk.chunk_index
+    # Convert main chunk index to int (might be float from Pinecone)
+    try:
+        main_chunk_index = int(result.chunk.chunk_index)
+    except (ValueError, TypeError):
+        logger.warning(f"Invalid main chunk_index: {result.chunk.chunk_index}")
+        return {"main_chunk": result, "before": [], "after": []}
     
     surrounding = {
         "main_chunk": result,
