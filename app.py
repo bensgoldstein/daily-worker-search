@@ -732,6 +732,9 @@ def generate_pdf_report(query_text: str, search_query: SearchQuery, results: Lis
         content.append(Paragraph("Source Analysis", heading_style))
         content.append(Spacer(1, 10))
         
+        # Debug log
+        logger.info(f"PDF Generation - Source Analysis mode with {len(source_analyses)} analyses")
+        
         # Add each source analysis
         for i, analysis_data in enumerate(source_analyses, 1):
             result = analysis_data['result']
@@ -758,7 +761,7 @@ def generate_pdf_report(query_text: str, search_query: SearchQuery, results: Lis
         
         content.append(Spacer(1, 20))
         
-    elif ai_response:
+    elif ai_response and response_mode != "Source Analysis":
         content.append(Paragraph("AI Summary", heading_style))
         
         # Parse and format AI response to preserve structure  
@@ -766,6 +769,13 @@ def generate_pdf_report(query_text: str, search_query: SearchQuery, results: Lis
         for element in formatted_ai_content:
             content.append(element)
         
+        content.append(Spacer(1, 20))
+    
+    # Debug fallback
+    elif response_mode == "Source Analysis":
+        logger.warning(f"Source Analysis mode but no analyses found. source_analyses: {source_analyses is not None}, length: {len(source_analyses) if source_analyses else 0}")
+        content.append(Paragraph("Source Analysis", heading_style))
+        content.append(Paragraph("No source analyses available.", styles['Normal']))
         content.append(Spacer(1, 20))
     
     # Results Summary
@@ -1711,11 +1721,17 @@ def main():
                             add_to_conversation(query_text, analysis_summary, results, search_query)
                         
                         # Store results and AI response in session state for PDF generation
+                        # For Source Analysis mode, don't store ai_response to ensure PDF uses source_analyses
+                        if response_mode == "Source Analysis":
+                            ai_response_for_storage = None
+                        else:
+                            ai_response_for_storage = ai_response
+                            
                         st.session_state.last_search = {
                             'query_text': query_text,
                             'search_query': search_query,
                             'results': results,
-                            'ai_response': ai_response,
+                            'ai_response': ai_response_for_storage,
                             'source_analyses': source_analyses,
                             'response_mode': response_mode,
                             'timestamp': datetime.now().strftime("%Y%m%d_%H%M%S")
