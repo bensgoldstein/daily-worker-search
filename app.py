@@ -1569,25 +1569,58 @@ def main():
                                 # New source analysis mode
                                 try:
                                     with st.spinner(f"Analyzing {len(results)} sources with PDF context..."):
+                                        import concurrent.futures
+                                        import threading
+                                        
                                         response_gen = ResponseGenerator()
                                         
-                                        for i, result in enumerate(results):
-                                            # Get PDF context for each result
-                                            pdf_context = get_pdf_context(result)
+                                        # Create a thread-local storage for response generators
+                                        thread_local = threading.local()
+                                        
+                                        def analyze_single_source(result):
+                                            """Analyze a single source in parallel."""
+                                            try:
+                                                # Each thread gets its own ResponseGenerator instance
+                                                if not hasattr(thread_local, 'response_gen'):
+                                                    thread_local.response_gen = ResponseGenerator()
+                                                
+                                                # Get PDF context
+                                                pdf_context = get_pdf_context(result)
+                                                
+                                                # Generate analysis
+                                                analysis = thread_local.response_gen.generate_source_analysis(
+                                                    enhanced_query_for_ai,
+                                                    result,
+                                                    pdf_context
+                                                )
+                                                
+                                                if analysis:
+                                                    return {
+                                                        'result': result,
+                                                        'analysis': analysis,
+                                                        'pdf_context': pdf_context
+                                                    }
+                                                return None
+                                            except Exception as e:
+                                                logger.error(f"Error analyzing source: {e}")
+                                                return None
+                                        
+                                        # Process all sources in parallel
+                                        with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+                                            # Submit all tasks
+                                            future_to_result = {
+                                                executor.submit(analyze_single_source, result): i 
+                                                for i, result in enumerate(results)
+                                            }
                                             
-                                            # Generate analysis for this source
-                                            analysis = response_gen.generate_source_analysis(
-                                                enhanced_query_for_ai,
-                                                result,
-                                                pdf_context
-                                            )
-                                            
-                                            if analysis:
-                                                source_analyses.append({
-                                                    'result': result,
-                                                    'analysis': analysis,
-                                                    'pdf_context': pdf_context
-                                                })
+                                            # Collect results as they complete
+                                            for future in concurrent.futures.as_completed(future_to_result):
+                                                result_data = future.result()
+                                                if result_data:
+                                                    source_analyses.append(result_data)
+                                        
+                                        # Sort analyses by original order
+                                        source_analyses.sort(key=lambda x: results.index(x['result']))
                                         
                                         # Display source analyses
                                         if source_analyses:
