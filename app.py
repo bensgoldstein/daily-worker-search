@@ -9,7 +9,7 @@ Streamlit application for searching historical Daily Worker newspapers.
 import streamlit as st
 from datetime import date, timedelta
 import os
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 from pathlib import Path
 import sys
 
@@ -18,7 +18,7 @@ project_root = Path(__file__).parent
 sys.path.append(str(project_root))
 
 from vector_database_hosted import VectorDatabaseHosted
-from models import SearchQuery, SearchResult
+from models import SearchQuery, SearchResult, NewspaperMetadata, DocumentChunk
 from config import config
 from loguru import logger
 from response_generator import ResponseGenerator
