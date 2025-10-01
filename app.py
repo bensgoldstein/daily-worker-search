@@ -848,15 +848,15 @@ def reconstruct_internet_archive_url(result: SearchResult) -> Optional[str]:
             year = meta.publication_date.year
             
             # Use appropriate pattern based on date when volume/issue are missing
-            if ("The Worker" in meta.newspaper_name and "Daily" not in meta.newspaper_name) or \
-               (year >= 1948 and year <= 1953 and meta.publication_date.weekday() == 6):
-                possible_ids = [f"per_daily-worker_the-worker_{date_str}"]
-            elif ((year == 1924) or (year == 1925) or (year == 1928) or (year >= 1954 and year <= 1958)):
+            if ((year == 1924) or (year == 1925) or (year == 1928) or (year >= 1954 and year <= 1958)):
                 possible_ids = [f"per_daily-worker_{date_str}"]
-            elif (year >= 1929 and year <= 1953):
-                possible_ids = [f"per_daily-worker_daily-worker_{date_str}"]
             elif (year >= 1926 and year <= 1927):
                 possible_ids = [f"per_daily-worker_the-daily-worker_{date_str}"]
+            elif (("The Worker" in meta.newspaper_name and "Daily" not in meta.newspaper_name) or 
+                  (year >= 1948 and year <= 1953 and meta.publication_date.weekday() == 6)):
+                possible_ids = [f"per_daily-worker_the-worker_{date_str}"]
+            elif (year >= 1929 and year <= 1953):
+                possible_ids = [f"per_daily-worker_daily-worker_{date_str}"]
             else:
                 possible_ids = [f"per_daily-worker_{date_str}"]
             
@@ -873,25 +873,26 @@ def reconstruct_internet_archive_url(result: SearchResult) -> Optional[str]:
         month = meta.publication_date.month
         day = meta.publication_date.day
         
-        # Method 4: Sunday editions of "The Worker" (1948-07-04 to 1953-12-27)
-        if ("The Worker" in meta.newspaper_name and "Daily" not in meta.newspaper_name) or \
-           (year >= 1948 and year <= 1953 and meta.publication_date.weekday() == 6):  # Sunday = 6
-            archive_id = f"per_daily-worker_the-worker_{date_str}_{volume}_{issue}"
-        
-        # Method 1: Multiple date ranges
-        elif ((year == 1924) or 
-              (year == 1925) or
-              (year == 1928) or
-              (year >= 1954 and year <= 1958)):
+        # Method 1: Multiple date ranges (check first to avoid conflicts)
+        if ((year == 1924) or 
+            (year == 1925) or
+            (year == 1928) or
+            (year >= 1954 and year <= 1958)):
             archive_id = f"per_daily-worker_{date_str}_{volume}_{issue}"
-        
-        # Method 2: 1929-01-01 to 1953-12-31
-        elif (year >= 1929 and year <= 1953):
-            archive_id = f"per_daily-worker_daily-worker_{date_str}_{volume}_{issue}"
         
         # Method 3: 1926-01-02 to 1927-12-31
         elif (year >= 1926 and year <= 1927):
             archive_id = f"per_daily-worker_the-daily-worker_{date_str}_{volume}_{issue}"
+        
+        # Method 4: Sunday editions of "The Worker" (1948-07-04 to 1953-12-27)
+        # This is a special case within the Method 2 date range
+        elif (("The Worker" in meta.newspaper_name and "Daily" not in meta.newspaper_name) or 
+              (year >= 1948 and year <= 1953 and meta.publication_date.weekday() == 6)):  # Sunday = 6
+            archive_id = f"per_daily-worker_the-worker_{date_str}_{volume}_{issue}"
+        
+        # Method 2: 1929-01-01 to 1953-12-31 (default for this range, includes non-Sunday 1948-53)
+        elif (year >= 1929 and year <= 1953):
+            archive_id = f"per_daily-worker_daily-worker_{date_str}_{volume}_{issue}"
         
         else:
             # Default fallback to Method 1
