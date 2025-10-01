@@ -847,11 +847,18 @@ def reconstruct_internet_archive_url(result: SearchResult) -> Optional[str]:
             date_str = meta.publication_date.strftime('%Y-%m-%d')
             year = meta.publication_date.year
             
-            # Try the simplified pattern without redundant newspaper name
-            possible_ids = [
-                f"per_daily-worker_{date_str}",
-                f"daily-worker_{date_str}"
-            ]
+            # Use appropriate pattern based on date when volume/issue are missing
+            if ("The Worker" in meta.newspaper_name and "Daily" not in meta.newspaper_name) or \
+               (year >= 1948 and year <= 1953 and meta.publication_date.weekday() == 6):
+                possible_ids = [f"per_daily-worker_the-worker_{date_str}"]
+            elif ((year == 1924) or (year == 1925) or (year == 1928) or (year >= 1954 and year <= 1958)):
+                possible_ids = [f"per_daily-worker_{date_str}"]
+            elif (year >= 1929 and year <= 1953):
+                possible_ids = [f"per_daily-worker_daily-worker_{date_str}"]
+            elif (year >= 1926 and year <= 1927):
+                possible_ids = [f"per_daily-worker_the-daily-worker_{date_str}"]
+            else:
+                possible_ids = [f"per_daily-worker_{date_str}"]
             
             # Return the first pattern as a best guess
             url = f"https://archive.org/details/{possible_ids[0]}"
@@ -861,13 +868,35 @@ def reconstruct_internet_archive_url(result: SearchResult) -> Optional[str]:
         # Format the date as YYYY-MM-DD
         date_str = meta.publication_date.strftime('%Y-%m-%d')
         
-        # Determine the pattern based on newspaper name and date
-        # Earlier Daily Worker issues (before ~1930) use "the-daily-worker" pattern
+        # Determine the pattern based on date according to the documentation
         year = meta.publication_date.year
+        month = meta.publication_date.month
+        day = meta.publication_date.day
         
-        # The correct pattern is simply: per_daily-worker_{date}_{volume}_{issue}
-        # No need to add the newspaper name again
-        archive_id = f"per_daily-worker_{date_str}_{volume}_{issue}"
+        # Method 4: Sunday editions of "The Worker" (1948-07-04 to 1953-12-27)
+        if ("The Worker" in meta.newspaper_name and "Daily" not in meta.newspaper_name) or \
+           (year >= 1948 and year <= 1953 and meta.publication_date.weekday() == 6):  # Sunday = 6
+            archive_id = f"per_daily-worker_the-worker_{date_str}_{volume}_{issue}"
+        
+        # Method 1: Multiple date ranges
+        elif ((year == 1924) or 
+              (year == 1925) or
+              (year == 1928) or
+              (year >= 1954 and year <= 1958)):
+            archive_id = f"per_daily-worker_{date_str}_{volume}_{issue}"
+        
+        # Method 2: 1929-01-01 to 1953-12-31
+        elif (year >= 1929 and year <= 1953):
+            archive_id = f"per_daily-worker_daily-worker_{date_str}_{volume}_{issue}"
+        
+        # Method 3: 1926-01-02 to 1927-12-31
+        elif (year >= 1926 and year <= 1927):
+            archive_id = f"per_daily-worker_the-daily-worker_{date_str}_{volume}_{issue}"
+        
+        else:
+            # Default fallback to Method 1
+            logger.warning(f"Date {date_str} doesn't match known patterns, using Method 1")
+            archive_id = f"per_daily-worker_{date_str}_{volume}_{issue}"
         
         url = f"https://archive.org/details/{archive_id}"
         logger.debug(f"Reconstructed URL: {url} for {meta.newspaper_name} {meta.publication_date}")
