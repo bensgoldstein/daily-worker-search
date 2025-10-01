@@ -1099,7 +1099,7 @@ def safe_pdf_download_button(usage_monitor: UsageMonitor, **kwargs) -> bool:
     return False
 
 
-def get_surrounding_chunks(vector_db, result: SearchResult, num_before: int = 2, num_after: int = 2) -> Dict[str, Any]:
+def get_surrounding_chunks(vector_db, result: SearchResult, num_before: int = 2, num_after: int = 2, cached_embedding=None) -> Dict[str, Any]:
     """Get chunks before and after the main chunk for context."""
     meta = result.chunk.newspaper_metadata
     # Convert main chunk index to int (might be float from Pinecone)
@@ -1125,42 +1125,33 @@ def get_surrounding_chunks(vector_db, result: SearchResult, num_before: int = 2,
         if not target_indices:
             return surrounding
             
-        # Query Pinecone for chunks with specific chunk indices using metadata filtering
+        # Query Pinecone for all surrounding chunks in a single request
         try:
-            # Create individual queries for each target chunk index
-            # This avoids the expensive vector search with top_k=1000
-            search_results = []
+            # Use Pinecone's $in operator to get all target chunks at once
+            metadata_filter = {
+                "newspaper_name": meta.newspaper_name,
+                "publication_date": meta.publication_date.isoformat(),
+                "chunk_index": {"$in": target_indices}
+            }
             
-            for target_idx in target_indices:
-                metadata_filter = {
-                    "newspaper_name": meta.newspaper_name,
-                    "publication_date": meta.publication_date.isoformat(),
-                    "chunk_index": target_idx
-                }
-                
-                # Use minimal vector search just to access metadata filtering
+            # Use cached embedding or generate once
+            if cached_embedding is None:
                 dummy_query_embedding = vector_db.pc.inference.embed(
                     model="multilingual-e5-large", 
                     inputs=[""],
                     parameters={"input_type": "query", "truncate": "END"}
                 )
-                
-                chunk_result = vector_db.index.query(
-                    vector=dummy_query_embedding[0].values,
-                    top_k=1,  # Only need 1 result per chunk_index
-                    filter=metadata_filter,
-                    include_metadata=True
-                )
-                
-                if chunk_result.matches:
-                    search_results.extend(chunk_result.matches)
+                query_vector = dummy_query_embedding[0].values
+            else:
+                query_vector = cached_embedding
             
-            # Convert to the expected format for the rest of the function
-            class MockSearchResult:
-                def __init__(self, matches):
-                    self.matches = matches
-            
-            search_results = MockSearchResult(search_results)
+            # Single query to get all surrounding chunks
+            search_results = vector_db.index.query(
+                vector=query_vector,
+                top_k=len(target_indices) * 2,  # Double to ensure we get all chunks
+                filter=metadata_filter,
+                include_metadata=True
+            )
             
             # Process results to find surrounding chunks
             found_chunks = {}
@@ -1668,9 +1659,17 @@ def main():
                                     with st.spinner(f"Analyzing {len(results)} sources with surrounding context..."):
                                         response_gen = ResponseGenerator()
                                         
+                                        # Generate dummy embedding once for all surrounding chunk queries
+                                        dummy_embedding = vector_db.pc.inference.embed(
+                                            model="multilingual-e5-large", 
+                                            inputs=[""],
+                                            parameters={"input_type": "query", "truncate": "END"}
+                                        )
+                                        cached_embedding = dummy_embedding[0].values
+                                        
                                         for i, result in enumerate(results):
                                             # Get surrounding chunks for each result
-                                            surrounding = get_surrounding_chunks(vector_db, result, context_chunks, context_chunks)
+                                            surrounding = get_surrounding_chunks(vector_db, result, context_chunks, context_chunks, cached_embedding)
                                             
                                             # Generate analysis for this source
                                             analysis = response_gen.generate_source_analysis(
