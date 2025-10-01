@@ -1147,16 +1147,30 @@ def get_surrounding_chunks(vector_db, result: SearchResult, num_before: int = 2,
             found_chunks = {}
             for match in search_results.matches:
                 chunk_metadata = match.metadata
-                chunk_index = chunk_metadata.get('chunk_index')
+                chunk_index_raw = chunk_metadata.get('chunk_index')
+                
+                # Convert to int if it's a float (Pinecone sometimes returns floats)
+                if chunk_index_raw is not None:
+                    try:
+                        chunk_index = int(chunk_index_raw)
+                    except (ValueError, TypeError):
+                        logger.warning(f"Invalid chunk_index: {chunk_index_raw}")
+                        continue
+                else:
+                    continue
                 
                 if chunk_index in target_indices:
                     # Reconstruct the chunk
                     try:
                         pub_date = date.fromisoformat(chunk_metadata.get('publication_date', ''))
+                        # Convert page_number to int if it exists and is not None
+                        page_num_raw = chunk_metadata.get('page_number')
+                        page_number = int(page_num_raw) if page_num_raw is not None else None
+                        
                         chunk_meta = NewspaperMetadata(
                             newspaper_name=chunk_metadata.get('newspaper_name', ''),
                             publication_date=pub_date,
-                            page_number=chunk_metadata.get('page_number'),
+                            page_number=page_number,
                             section=chunk_metadata.get('section')
                         )
                         
@@ -1165,8 +1179,8 @@ def get_surrounding_chunks(vector_db, result: SearchResult, num_before: int = 2,
                             content=chunk_metadata.get('text', ''),
                             newspaper_metadata=chunk_meta,
                             chunk_index=chunk_index,
-                            start_char=chunk_metadata.get('start_char', 0),
-                            end_char=chunk_metadata.get('end_char', 0)
+                            start_char=int(chunk_metadata.get('start_char', 0)),
+                            end_char=int(chunk_metadata.get('end_char', 0))
                         )
                         
                         found_chunks[chunk_index] = chunk
