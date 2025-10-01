@@ -1125,28 +1125,42 @@ def get_surrounding_chunks(vector_db, result: SearchResult, num_before: int = 2,
         if not target_indices:
             return surrounding
             
-        # Query Pinecone for chunks from the same document with specific chunk indices
-        # We'll use a broad query and filter results
+        # Query Pinecone for chunks with specific chunk indices using metadata filtering
         try:
-            # Use a dummy query embedding to search - we'll filter by metadata
-            dummy_query_embedding = vector_db.pc.inference.embed(
-                model="multilingual-e5-large", 
-                inputs=[""],
-                parameters={"input_type": "query", "truncate": "END"}
-            )
+            # Create individual queries for each target chunk index
+            # This avoids the expensive vector search with top_k=1000
+            search_results = []
             
-            # Search with metadata filter for same newspaper and date
-            metadata_filter = {
-                "newspaper_name": meta.newspaper_name,
-                "publication_date": meta.publication_date.isoformat()
-            }
+            for target_idx in target_indices:
+                metadata_filter = {
+                    "newspaper_name": meta.newspaper_name,
+                    "publication_date": meta.publication_date.isoformat(),
+                    "chunk_index": target_idx
+                }
+                
+                # Use minimal vector search just to access metadata filtering
+                dummy_query_embedding = vector_db.pc.inference.embed(
+                    model="multilingual-e5-large", 
+                    inputs=[""],
+                    parameters={"input_type": "query", "truncate": "END"}
+                )
+                
+                chunk_result = vector_db.index.query(
+                    vector=dummy_query_embedding[0].values,
+                    top_k=1,  # Only need 1 result per chunk_index
+                    filter=metadata_filter,
+                    include_metadata=True
+                )
+                
+                if chunk_result.matches:
+                    search_results.extend(chunk_result.matches)
             
-            search_results = vector_db.index.query(
-                vector=dummy_query_embedding[0].values,
-                top_k=1000,  # Get many results to find the right chunks
-                filter=metadata_filter,
-                include_metadata=True
-            )
+            # Convert to the expected format for the rest of the function
+            class MockSearchResult:
+                def __init__(self, matches):
+                    self.matches = matches
+            
+            search_results = MockSearchResult(search_results)
             
             # Process results to find surrounding chunks
             found_chunks = {}
