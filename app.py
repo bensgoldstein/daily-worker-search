@@ -237,8 +237,10 @@ def parse_ai_response_for_pdf(ai_response: str, styles, search_results: List[Sea
             import html
             import re
             heading_text = html.unescape(heading_text)
-            heading_text = re.sub(r'<[^>]+>', '', heading_text)
-            heading_text = re.sub(r'[<>&]', '', heading_text)
+            # Preserve <link> tags but remove other HTML tags
+            heading_text = re.sub(r'<(?!/?link)[^>]+>', '', heading_text)
+            # Don't remove < > from link tags
+            heading_text = re.sub(r'&(?!(?:lt|gt|amp);)', '', heading_text)
             elements.append(Paragraph(heading_text, ai_heading_style))
             
         elif line.startswith('###'):
@@ -253,8 +255,10 @@ def parse_ai_response_for_pdf(ai_response: str, styles, search_results: List[Sea
             import html
             import re
             subheading_text = html.unescape(subheading_text)
-            subheading_text = re.sub(r'<[^>]+>', '', subheading_text)
-            subheading_text = re.sub(r'[<>&]', '', subheading_text)
+            # Preserve <link> tags but remove other HTML tags
+            subheading_text = re.sub(r'<(?!/?link)[^>]+>', '', subheading_text)
+            # Don't remove < > from link tags
+            subheading_text = re.sub(r'&(?!(?:lt|gt|amp);)', '', subheading_text)
             elements.append(Paragraph(subheading_text, ai_subheading_style))
             
         elif line.startswith('**') and line.endswith('**') and len(line) > 4:
@@ -269,8 +273,10 @@ def parse_ai_response_for_pdf(ai_response: str, styles, search_results: List[Sea
             import html
             import re
             bold_text = html.unescape(bold_text)
-            bold_text = re.sub(r'<[^>]+>', '', bold_text)
-            bold_text = re.sub(r'[<>&]', '', bold_text)
+            # Preserve <link> tags but remove other HTML tags
+            bold_text = re.sub(r'<(?!/?link)[^>]+>', '', bold_text)
+            # Don't remove < > from link tags
+            bold_text = re.sub(r'&(?!(?:lt|gt|amp);)', '', bold_text)
             elements.append(Paragraph(f"<b>{bold_text}</b>", ai_subheading_style))
             
         elif line.startswith('- ') or line.startswith('• '):
@@ -286,8 +292,10 @@ def parse_ai_response_for_pdf(ai_response: str, styles, search_results: List[Sea
             import re
             bullet_text = bullet_text.replace('**', '')
             bullet_text = html.unescape(bullet_text)
-            bullet_text = re.sub(r'<[^>]+>', '', bullet_text)
-            bullet_text = re.sub(r'[<>&]', '', bullet_text)
+            # Preserve <link> tags but remove other HTML tags
+            bullet_text = re.sub(r'<(?!/?link)[^>]+>', '', bullet_text)
+            # Don't remove < > from link tags
+            bullet_text = re.sub(r'&(?!(?:lt|gt|amp);)', '', bullet_text)
             elements.append(Paragraph(f"• {bullet_text}", ai_bullet_style))
             
         elif line.startswith('*') and not line.startswith('**'):
@@ -302,8 +310,10 @@ def parse_ai_response_for_pdf(ai_response: str, styles, search_results: List[Sea
             import html
             import re
             bullet_text = html.unescape(bullet_text)
-            bullet_text = re.sub(r'<[^>]+>', '', bullet_text)
-            bullet_text = re.sub(r'[<>&]', '', bullet_text)
+            # Preserve <link> tags but remove other HTML tags
+            bullet_text = re.sub(r'<(?!/?link)[^>]+>', '', bullet_text)
+            # Don't remove < > from link tags
+            bullet_text = re.sub(r'&(?!(?:lt|gt|amp);)', '', bullet_text)
             elements.append(Paragraph(f"• {bullet_text}", ai_bullet_style))
             
         else:
@@ -314,9 +324,10 @@ def parse_ai_response_for_pdf(ai_response: str, styles, search_results: List[Sea
             clean_line = line.replace('**', '').replace('*', '')
             # Clean HTML entities and tags
             clean_line = html.unescape(clean_line)
-            clean_line = re.sub(r'<[^>]+>', '', clean_line)
-            # Remove problematic characters
-            clean_line = re.sub(r'[<>&]', '', clean_line)
+            # Preserve <link> tags but remove other HTML tags
+            clean_line = re.sub(r'<(?!/?link)[^>]+>', '', clean_line)
+            # Don't remove < > from link tags
+            clean_line = re.sub(r'&(?!(?:lt|gt|amp);)', '', clean_line)
             current_paragraph.append(clean_line)
     
     # Add any remaining paragraph
