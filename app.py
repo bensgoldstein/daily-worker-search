@@ -1099,6 +1099,102 @@ def safe_pdf_download_button(usage_monitor: UsageMonitor, **kwargs) -> bool:
     return False
 
 
+def get_surrounding_chunks(vector_db, result: SearchResult, num_before: int = 2, num_after: int = 2) -> Dict[str, Any]:
+    """Get chunks before and after the main chunk for context."""
+    meta = result.chunk.newspaper_metadata
+    main_chunk_index = result.chunk.chunk_index
+    
+    surrounding = {
+        "main_chunk": result,
+        "before": [],
+        "after": []
+    }
+    
+    try:
+        # Create target chunk indices
+        target_indices = []
+        for i in range(main_chunk_index - num_before, main_chunk_index + num_after + 1):
+            if i >= 0 and i != main_chunk_index:  # Don't include the main chunk itself
+                target_indices.append(i)
+        
+        if not target_indices:
+            return surrounding
+            
+        # Query Pinecone for chunks from the same document with specific chunk indices
+        # We'll use a broad query and filter results
+        try:
+            # Use a dummy query embedding to search - we'll filter by metadata
+            dummy_query_embedding = vector_db.pc.inference.embed(
+                model="multilingual-e5-large", 
+                inputs=[""],
+                parameters={"input_type": "query", "truncate": "END"}
+            )
+            
+            # Search with metadata filter for same newspaper and date
+            metadata_filter = {
+                "newspaper_name": meta.newspaper_name,
+                "publication_date": meta.publication_date.isoformat()
+            }
+            
+            search_results = vector_db.index.query(
+                vector=dummy_query_embedding[0].values,
+                top_k=1000,  # Get many results to find the right chunks
+                filter=metadata_filter,
+                include_metadata=True
+            )
+            
+            # Process results to find surrounding chunks
+            found_chunks = {}
+            for match in search_results.matches:
+                chunk_metadata = match.metadata
+                chunk_index = chunk_metadata.get('chunk_index')
+                
+                if chunk_index in target_indices:
+                    # Reconstruct the chunk
+                    try:
+                        pub_date = date.fromisoformat(chunk_metadata.get('publication_date', ''))
+                        chunk_meta = NewspaperMetadata(
+                            newspaper_name=chunk_metadata.get('newspaper_name', ''),
+                            publication_date=pub_date,
+                            page_number=chunk_metadata.get('page_number'),
+                            section=chunk_metadata.get('section')
+                        )
+                        
+                        chunk = DocumentChunk(
+                            chunk_id=match.id,
+                            content=chunk_metadata.get('text', ''),
+                            newspaper_metadata=chunk_meta,
+                            chunk_index=chunk_index,
+                            start_char=chunk_metadata.get('start_char', 0),
+                            end_char=chunk_metadata.get('end_char', 0)
+                        )
+                        
+                        found_chunks[chunk_index] = chunk
+                        
+                    except Exception as e:
+                        logger.warning(f"Error reconstructing chunk {chunk_index}: {e}")
+                        continue
+            
+            # Sort chunks into before/after lists
+            for idx in range(main_chunk_index - num_before, main_chunk_index):
+                if idx in found_chunks:
+                    surrounding["before"].append(found_chunks[idx])
+                    
+            for idx in range(main_chunk_index + 1, main_chunk_index + num_after + 1):
+                if idx in found_chunks:
+                    surrounding["after"].append(found_chunks[idx])
+            
+            logger.debug(f"Found {len(surrounding['before'])} chunks before and {len(surrounding['after'])} chunks after main chunk {main_chunk_index}")
+            
+        except Exception as e:
+            logger.error(f"Error querying for surrounding chunks: {e}")
+            
+    except Exception as e:
+        logger.error(f"Error getting surrounding chunks: {e}")
+    
+    return surrounding
+
+
 def apply_source_diversification(results: List[SearchResult], diversity_weight: float = 0.3) -> List[SearchResult]:
     """Apply source diversification by penalizing previously used sources."""
     if not st.session_state.used_sources:
@@ -1305,16 +1401,44 @@ def main():
                 help="Minimum relevance score to include results"
             )
             
-            # Add AI enhancement option
-            use_ai_enhancement = st.checkbox(
-                "Enhanced AI Summary (Gemini)",
-                value=True if config.GEMINI_API_KEY else False,
-                help="Use Gemini AI to synthesize search results into a comprehensive answer",
-                disabled=not config.GEMINI_API_KEY
+            # Response Mode Selection
+            st.markdown("**Response Mode**")
+            
+            response_mode = st.radio(
+                "Select how to process results",
+                ["Essay Generation", "Source Analysis"],
+                help="""
+                - **Essay Generation**: AI synthesizes all results into a comprehensive answer
+                - **Source Analysis**: AI analyzes each source individually with surrounding context
+                """
             )
             
-            if not config.GEMINI_API_KEY and use_ai_enhancement:
-                st.warning("Add GEMINI_API_KEY to .env file to enable AI summaries")
+            # Only show AI enhancement option for Essay Generation mode
+            if response_mode == "Essay Generation":
+                use_ai_enhancement = st.checkbox(
+                    "Enhanced AI Summary (Gemini)",
+                    value=True if config.GEMINI_API_KEY else False,
+                    help="Use Gemini AI to synthesize search results into a comprehensive answer",
+                    disabled=not config.GEMINI_API_KEY
+                )
+                
+                if not config.GEMINI_API_KEY and use_ai_enhancement:
+                    st.warning("Add GEMINI_API_KEY to .env file to enable AI summaries")
+            else:
+                # Source Analysis mode always uses AI
+                use_ai_enhancement = True
+                if not config.GEMINI_API_KEY:
+                    st.warning("Source Analysis mode requires GEMINI_API_KEY in .env file")
+            
+            # Context window for Source Analysis mode
+            if response_mode == "Source Analysis":
+                context_chunks = st.slider(
+                    "Context chunks on each side",
+                    min_value=1,
+                    max_value=3,
+                    value=2,
+                    help="Number of chunks before and after the main chunk to provide context"
+                )
     
     # Show conversation history if it exists
     
@@ -1473,36 +1597,91 @@ def main():
                         # Record the search for usage tracking
                         usage_monitor.record_search(used_ai=use_ai_enhancement)
                         
-                        # Generate AI summary if requested
+                        # Handle different response modes
                         ai_response = None
+                        source_analyses = []
+                        
                         if use_ai_enhancement and config.GEMINI_API_KEY:
-                            try:
-                                with st.spinner("Generating AI summary..."):
-                                    response_gen = ResponseGenerator()
-                                    ai_response = response_gen.generate_response(
-                                        enhanced_query_for_ai,  # Use enhanced query for AI
-                                        results,
-                                        max_results_to_use=min(max_results, len(results))
-                                    )
-                                    
-                                if ai_response:
-                                    st.markdown("### AI Summary")
-                                    with st.container():
-                                        # Make source references clickable
-                                        clickable_response = make_source_references_clickable(ai_response, results)
-                                        st.markdown(
-                                            f'<div style="background-color: #f0f8ff; padding: 1.5rem; '
-                                            f'border-radius: 10px; border-left: 4px solid #4285f4;">'
-                                            f'{clickable_response}</div>',
-                                            unsafe_allow_html=True
+                            if response_mode == "Essay Generation":
+                                # Traditional essay generation mode
+                                try:
+                                    with st.spinner("Generating AI summary..."):
+                                        response_gen = ResponseGenerator()
+                                        ai_response = response_gen.generate_response(
+                                            enhanced_query_for_ai,  # Use enhanced query for AI
+                                            results,
+                                            max_results_to_use=min(max_results, len(results))
                                         )
-                                    st.markdown("---")
+                                        
+                                    if ai_response:
+                                        st.markdown("### AI Summary")
+                                        with st.container():
+                                            # Make source references clickable
+                                            clickable_response = make_source_references_clickable(ai_response, results)
+                                            st.markdown(
+                                                f'<div style="background-color: #f0f8ff; padding: 1.5rem; '
+                                                f'border-radius: 10px; border-left: 4px solid #4285f4;">'
+                                                f'{clickable_response}</div>',
+                                                unsafe_allow_html=True
+                                            )
+                                        st.markdown("---")
+                                                
+                                except Exception as e:
+                                    st.error(f"Error generating AI summary: {e}")
+                            
+                            elif response_mode == "Source Analysis":
+                                # New source analysis mode
+                                try:
+                                    with st.spinner(f"Analyzing {len(results)} sources with surrounding context..."):
+                                        response_gen = ResponseGenerator()
+                                        
+                                        for i, result in enumerate(results):
+                                            # Get surrounding chunks for each result
+                                            surrounding = get_surrounding_chunks(vector_db, result, context_chunks, context_chunks)
                                             
-                            except Exception as e:
-                                st.error(f"Error generating AI summary: {e}")
+                                            # Generate analysis for this source
+                                            analysis = response_gen.generate_source_analysis(
+                                                enhanced_query_for_ai,
+                                                result,
+                                                surrounding
+                                            )
+                                            
+                                            if analysis:
+                                                source_analyses.append({
+                                                    'result': result,
+                                                    'analysis': analysis,
+                                                    'surrounding': surrounding
+                                                })
+                                        
+                                        # Display source analyses
+                                        if source_analyses:
+                                            st.markdown("### Source Analysis")
+                                            for i, analysis_data in enumerate(source_analyses):
+                                                result = analysis_data['result']
+                                                analysis = analysis_data['analysis']
+                                                
+                                                # Create expandable section for each source
+                                                with st.expander(f"Source {i+1}: {result.chunk.newspaper_metadata.newspaper_name} - {result.format_citation()}", expanded=i<3):
+                                                    st.markdown(analysis)
+                                                    
+                                                    # Add link to Internet Archive if available
+                                                    source_url = result.chunk.newspaper_metadata.source_url
+                                                    if not source_url:
+                                                        source_url = reconstruct_internet_archive_url(result)
+                                                    if source_url:
+                                                        st.markdown(f"📰 [View on Internet Archive]({source_url})")
+                                            st.markdown("---")
+                                                
+                                except Exception as e:
+                                    st.error(f"Error generating source analysis: {e}")
                         
                         # Add to conversation history
-                        add_to_conversation(query_text, ai_response or "", results, search_query)  # Track all retrieved sources
+                        if response_mode == "Essay Generation":
+                            add_to_conversation(query_text, ai_response or "", results, search_query)
+                        else:
+                            # For Source Analysis, create a summary for conversation history
+                            analysis_summary = f"Source Analysis: {len(source_analyses)} sources analyzed"
+                            add_to_conversation(query_text, analysis_summary, results, search_query)
                         
                         # Store results and AI response in session state for PDF generation
                         st.session_state.last_search = {
@@ -1510,6 +1689,8 @@ def main():
                             'search_query': search_query,
                             'results': results,
                             'ai_response': ai_response,
+                            'source_analyses': source_analyses,
+                            'response_mode': response_mode,
                             'timestamp': datetime.now().strftime("%Y%m%d_%H%M%S")
                         }
                         

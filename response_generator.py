@@ -118,6 +118,91 @@ CITATION FORMAT RULES:
 
 If the Daily Worker sources don't contain enough information to fully answer the question, acknowledge this and explain what information is available from these CPUSA newspaper archives."""
     
+    def generate_source_analysis(
+        self,
+        query: str,
+        main_chunk,
+        surrounding_context: dict
+    ) -> Optional[str]:
+        """Generate analysis for a single source with surrounding context."""
+        
+        if not self.model and self.provider != "openai":
+            return None
+            
+        # Build context from surrounding chunks
+        context_parts = []
+        
+        # Add before chunks
+        if surrounding_context["before"]:
+            context_parts.append("**Context Before:**")
+            for i, chunk in enumerate(surrounding_context["before"]):
+                context_parts.append(f"[Before-{i+1}] {chunk.content[:200]}...")
+            context_parts.append("")
+        
+        # Add main chunk
+        context_parts.append("**Main Source (focus of analysis):**")
+        context_parts.append(f"[MAIN] {main_chunk.chunk.content}")
+        context_parts.append("")
+        
+        # Add after chunks  
+        if surrounding_context["after"]:
+            context_parts.append("**Context After:**")
+            for i, chunk in enumerate(surrounding_context["after"]):
+                context_parts.append(f"[After-{i+1}] {chunk.content[:200]}...")
+        
+        context = "\n".join(context_parts)
+        
+        # Create analysis prompt
+        prompt = self._create_source_analysis_prompt(query, context, main_chunk)
+        
+        try:
+            if self.provider == "gemini":
+                response = self.model.generate_content(prompt)
+                return response.text
+                
+            elif self.provider == "openai":
+                response = self.client.chat.completions.create(
+                    model=config.LLM_MODEL,
+                    messages=[
+                        {"role": "system", "content": self._get_source_analysis_system_prompt()},
+                        {"role": "user", "content": prompt}
+                    ],
+                    temperature=config.LLM_TEMPERATURE,
+                    max_tokens=config.LLM_MAX_TOKENS
+                )
+                return response.choices[0].message.content
+                
+        except Exception as e:
+            logger.error(f"Error generating source analysis: {e}")
+            return None
+    
+    def _get_source_analysis_system_prompt(self) -> str:
+        """Get the system prompt for source analysis mode."""
+        return """You are a historical research assistant analyzing individual Daily Worker sources.
+Your task is to analyze how a specific source relates to a research question and provide context about the article.
+Focus on the MAIN source while using surrounding context to understand the broader article.
+Be concise but insightful in your analysis."""
+    
+    def _create_source_analysis_prompt(self, query: str, context: str, main_chunk) -> str:
+        """Create the prompt for source analysis."""
+        meta = main_chunk.chunk.newspaper_metadata
+        citation = main_chunk.format_citation()
+        
+        return f"""Research Question: {query}
+
+{context}
+
+Please analyze the MAIN source in relation to the research question. Provide:
+
+1. **Relevance**: How does this source relate to the research question? (2-3 sentences)
+
+2. **Article Context**: Based on the surrounding content, what type of article is this and what is its broader focus? (2-3 sentences)
+
+3. **Key Information**: What specific facts, dates, names, or events does this source contribute? (bullet points)
+
+**Source Citation**: {citation}
+**Publication**: Daily Worker, {meta.publication_date}"""
+
     def format_response_with_citations(
         self,
         response: str,
