@@ -675,6 +675,11 @@ def generate_pdf_report(query_text: str, search_query: SearchQuery, results: Lis
     if not PDF_AVAILABLE:
         raise ImportError("PDF generation not available. Install reportlab: pip install reportlab")
     
+    # Debug logging
+    logger.info(f"PDF Report Generation - Mode: {response_mode}")
+    logger.info(f"PDF Report - AI Response: {ai_response[:50] if ai_response else 'None'}")
+    logger.info(f"PDF Report - Source Analyses: {len(source_analyses) if source_analyses else 'None'}")
+    
     import re
     buffer = BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=A4, topMargin=1*inch)
@@ -728,17 +733,23 @@ def generate_pdf_report(query_text: str, search_query: SearchQuery, results: Lis
     content.append(Spacer(1, 20))
     
     # AI Summary or Source Analysis
+    logger.info(f"PDF - Checking conditions: mode={response_mode}, analyses={bool(source_analyses)}")
     if response_mode == "Source Analysis" and source_analyses:
         content.append(Paragraph("Source Analysis", heading_style))
         content.append(Spacer(1, 10))
         
         # Debug log
-        logger.info(f"PDF Generation - Source Analysis mode with {len(source_analyses)} analyses")
+        logger.info(f"PDF Generation - Entering Source Analysis section with {len(source_analyses)} analyses")
         
         # Add each source analysis
         for i, analysis_data in enumerate(source_analyses, 1):
-            result = analysis_data['result']
-            analysis = analysis_data['analysis']
+            logger.info(f"PDF - Processing source {i}, keys: {list(analysis_data.keys())}")
+            result = analysis_data.get('result')
+            analysis = analysis_data.get('analysis')
+            
+            if not result or not analysis:
+                logger.error(f"PDF - Missing data for source {i}: result={bool(result)}, analysis={bool(analysis)}")
+                continue
             
             # Source header
             header_text = f"Source {i}: {result.chunk.newspaper_metadata.newspaper_name} - {result.format_citation()}"
@@ -746,16 +757,33 @@ def generate_pdf_report(query_text: str, search_query: SearchQuery, results: Lis
             
             # Parse and format the analysis
             if analysis:
+                logger.info(f"PDF - Processing analysis for source {i}: {len(analysis)} chars")
                 # Split analysis into paragraphs and format
-                for para in analysis.split('\n\n'):
+                paragraphs = analysis.split('\n\n')
+                for para in paragraphs:
                     if para.strip():
                         # Handle markdown bold **text** - replace pairs properly
                         para = re.sub(r'\*\*([^*]+)\*\*', r'<b>\1</b>', para)
                         # Handle bullet points
                         if para.strip().startswith('-') or para.strip().startswith('•'):
                             para = f"• {para.strip()[1:].strip()}"
-                        content.append(Paragraph(para, styles['Normal']))
-                        content.append(Spacer(1, 6))
+                        
+                        # Escape special characters for ReportLab
+                        para = para.replace('&', '&amp;')
+                        para = para.replace('<', '&lt;').replace('>', '&gt;')
+                        # But keep our bold tags
+                        para = para.replace('&lt;b&gt;', '<b>').replace('&lt;/b&gt;', '</b>')
+                        
+                        try:
+                            content.append(Paragraph(para, styles['Normal']))
+                            content.append(Spacer(1, 6))
+                        except Exception as e:
+                            logger.error(f"Error adding paragraph to PDF: {e}")
+                            # Fallback to plain text
+                            content.append(Paragraph(para.replace('<b>', '').replace('</b>', ''), styles['Normal']))
+                            content.append(Spacer(1, 6))
+            else:
+                logger.warning(f"PDF - No analysis found for source {i}")
             
             content.append(Spacer(1, 15))
         
