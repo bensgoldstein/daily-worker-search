@@ -663,16 +663,19 @@ def generate_pdf_data() -> bytes:
         search_data['query_text'],
         search_data['search_query'],
         search_data['results'],
-        search_data['ai_response']
+        search_data.get('ai_response'),
+        search_data.get('source_analyses'),
+        search_data.get('response_mode', 'Essay Generation')
     )
     return pdf_buffer.getvalue()
 
 
-def generate_pdf_report(query_text: str, search_query: SearchQuery, results: List[SearchResult], ai_response: Optional[str] = None) -> BytesIO:
+def generate_pdf_report(query_text: str, search_query: SearchQuery, results: List[SearchResult], ai_response: Optional[str] = None, source_analyses: Optional[List[Dict]] = None, response_mode: str = "Essay Generation") -> BytesIO:
     """Generate a PDF report of search results."""
     if not PDF_AVAILABLE:
         raise ImportError("PDF generation not available. Install reportlab: pip install reportlab")
     
+    import re
     buffer = BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=A4, topMargin=1*inch)
     
@@ -724,8 +727,38 @@ def generate_pdf_report(query_text: str, search_query: SearchQuery, results: Lis
     content.append(search_table)
     content.append(Spacer(1, 20))
     
-    # AI Summary if available
-    if ai_response:
+    # AI Summary or Source Analysis
+    if response_mode == "Source Analysis" and source_analyses:
+        content.append(Paragraph("Source Analysis", heading_style))
+        content.append(Spacer(1, 10))
+        
+        # Add each source analysis
+        for i, analysis_data in enumerate(source_analyses, 1):
+            result = analysis_data['result']
+            analysis = analysis_data['analysis']
+            
+            # Source header
+            header_text = f"Source {i}: {result.chunk.newspaper_metadata.newspaper_name} - {result.format_citation()}"
+            content.append(Paragraph(header_text, styles['Heading3']))
+            
+            # Parse and format the analysis
+            if analysis:
+                # Split analysis into paragraphs and format
+                for para in analysis.split('\n\n'):
+                    if para.strip():
+                        # Handle markdown bold **text** - replace pairs properly
+                        para = re.sub(r'\*\*([^*]+)\*\*', r'<b>\1</b>', para)
+                        # Handle bullet points
+                        if para.strip().startswith('-') or para.strip().startswith('•'):
+                            para = f"• {para.strip()[1:].strip()}"
+                        content.append(Paragraph(para, styles['Normal']))
+                        content.append(Spacer(1, 6))
+            
+            content.append(Spacer(1, 15))
+        
+        content.append(Spacer(1, 20))
+        
+    elif ai_response:
         content.append(Paragraph("AI Summary", heading_style))
         
         # Parse and format AI response to preserve structure  
@@ -1678,7 +1711,9 @@ def main():
                                     query_text,
                                     search_query,
                                     results,
-                                    ai_response
+                                    ai_response,
+                                    source_analyses,
+                                    response_mode
                                 )
                                 if st.download_button(
                                     label=button_label,
