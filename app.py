@@ -1445,8 +1445,28 @@ def main():
             # Show success message for previous search
             st.success(f"Previous search results for: '{previous_data['query_text']}'")
             
-            # Show AI summary if it exists
-            if previous_data['ai_response']:
+            # Show AI summary or Source Analysis based on mode
+            response_mode = previous_data.get('response_mode', 'Essay Generation')
+            
+            if response_mode == "Source Analysis" and previous_data.get('source_analyses'):
+                st.markdown("### Source Analysis")
+                for i, analysis_data in enumerate(previous_data['source_analyses'], 1):
+                    result = analysis_data['result']
+                    analysis = analysis_data['analysis']
+                    
+                    # Create expandable section for each source
+                    with st.expander(f"Source {i}: {result.chunk.newspaper_metadata.newspaper_name} - {result.format_citation()}", expanded=i<3):
+                        st.markdown(analysis)
+                        
+                        # Add link to Internet Archive if available
+                        source_url = result.chunk.newspaper_metadata.source_url
+                        if not source_url:
+                            source_url = reconstruct_internet_archive_url(result)
+                        if source_url:
+                            st.markdown(f"[View in Internet Archive]({source_url})")
+                st.markdown("---")
+                
+            elif previous_data.get('ai_response'):
                 st.markdown("### AI Summary")
                 with st.container():
                     # Make source references clickable for previous search results
@@ -1462,7 +1482,10 @@ def main():
             # Show PDF download button
             if PDF_AVAILABLE:
                 try:
-                    if previous_data['ai_response']:
+                    if response_mode == "Source Analysis" and previous_data.get('source_analyses'):
+                        button_label = "Download Complete Report with Source Analysis as PDF"
+                        button_help = "Download search results with individual source analyses as PDF"
+                    elif previous_data.get('ai_response'):
                         button_label = "Download Complete Report with AI Summary as PDF"
                         button_help = "Download complete search results with AI summary as PDF"
                     else:
@@ -1473,7 +1496,9 @@ def main():
                         previous_data['query_text'],
                         previous_data['search_query'],
                         previous_data['results'],
-                        previous_data.get('ai_response')
+                        previous_data.get('ai_response'),
+                        previous_data.get('source_analyses'),
+                        previous_data.get('response_mode', 'Essay Generation')
                     )
                     st.download_button(
                         label=button_label,
@@ -1700,7 +1725,10 @@ def main():
                         if PDF_AVAILABLE:
                             try:
                                 # Download button with appropriate label
-                                if ai_response:
+                                if response_mode == "Source Analysis" and source_analyses:
+                                    button_label = "Download Complete Report with Source Analysis as PDF"
+                                    button_help = "Download search results with individual source analyses as PDF"
+                                elif ai_response:
                                     button_label = "Download Complete Report with AI Summary as PDF"
                                     button_help = "Download complete search results with AI summary as PDF"
                                 else:
