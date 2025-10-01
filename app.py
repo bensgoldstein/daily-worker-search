@@ -444,8 +444,57 @@ def generate_full_conversation_pdf() -> BytesIO:
         content.append(exchange_table)
         content.append(Spacer(1, 15))
         
-        # AI Response
-        if exchange.get('response'):
+        # AI Response or Source Analysis
+        response_mode = exchange.get('response_mode', 'Essay Generation')
+        
+        if response_mode == "Source Analysis" and exchange.get('source_analyses'):
+            content.append(Paragraph("Source Analysis", heading_style))
+            
+            # Add each source analysis
+            for j, analysis_data in enumerate(exchange['source_analyses'], 1):
+                result = analysis_data.get('result')
+                analysis = analysis_data.get('analysis')
+                
+                if not result or not analysis:
+                    continue
+                    
+                # Source header
+                header_text = f"Source {j}: {result.chunk.newspaper_metadata.newspaper_name} - {result.format_citation()}"
+                content.append(Paragraph(header_text, styles['Heading4']))
+                
+                # Parse and format the analysis
+                import re
+                paragraphs = analysis.split('\n\n')
+                for para in paragraphs:
+                    if para.strip():
+                        # Handle markdown bold and clean for PDF
+                        para = re.sub(r'\*\*([^*]+)\*\*', r'<b>\1</b>', para)
+                        # Handle bullet points
+                        if para.strip().startswith('-') or para.strip().startswith('•'):
+                            para = f"• {para.strip()[1:].strip()}"
+                        
+                        # Escape special characters
+                        para = para.replace('&', '&amp;')
+                        para = para.replace('<b>', '|||BOLD_START|||')
+                        para = para.replace('</b>', '|||BOLD_END|||')
+                        para = para.replace('<', '&lt;').replace('>', '&gt;')
+                        para = para.replace('|||BOLD_START|||', '<b>')
+                        para = para.replace('|||BOLD_END|||', '</b>')
+                        
+                        try:
+                            content.append(Paragraph(para, styles['Normal']))
+                            content.append(Spacer(1, 6))
+                        except:
+                            # Fallback to plain text
+                            clean_para = re.sub(r'<[^>]+>', '', para)
+                            content.append(Paragraph(clean_para, styles['Normal']))
+                            content.append(Spacer(1, 6))
+                
+                content.append(Spacer(1, 15))
+            
+            content.append(Spacer(1, 20))
+            
+        elif exchange.get('response'):
             content.append(Paragraph("AI Response", heading_style))
             
             # Parse and format AI response
@@ -1140,7 +1189,7 @@ def initialize_conversation_state():
     if 'conversation_context' not in st.session_state:
         st.session_state.conversation_context = ""
 
-def add_to_conversation(query: str, ai_response: str, sources: List[SearchResult], search_query: SearchQuery = None):
+def add_to_conversation(query: str, ai_response: str, sources: List[SearchResult], search_query: SearchQuery = None, source_analyses: List[Dict] = None, response_mode: str = "Essay Generation"):
     """Add a query-response pair to conversation history."""
     conversation_entry = {
         'query': query,
@@ -1148,7 +1197,9 @@ def add_to_conversation(query: str, ai_response: str, sources: List[SearchResult
         'timestamp': datetime.now(),
         'source_ids': [result.chunk.chunk_id for result in sources],
         'sources': sources,  # Store full SearchResult objects for PDF generation
-        'search_query': search_query  # Store search query for PDF generation
+        'search_query': search_query,  # Store search query for PDF generation
+        'source_analyses': source_analyses,  # Store source analyses for Source Analysis mode
+        'response_mode': response_mode  # Store response mode
     }
     st.session_state.conversation_history.append(conversation_entry)
     
@@ -1769,9 +1820,9 @@ def main():
                         if response_mode == "Essay Generation":
                             add_to_conversation(query_text, ai_response or "", results, search_query)
                         else:
-                            # For Source Analysis, create a summary for conversation history
+                            # For Source Analysis, create a summary for conversation history but also store the analyses
                             analysis_summary = f"Source Analysis: {len(source_analyses)} sources analyzed"
-                            add_to_conversation(query_text, analysis_summary, results, search_query)
+                            add_to_conversation(query_text, analysis_summary, results, search_query, source_analyses, response_mode)
                         
                         # Store results and AI response in session state for PDF generation
                         # For Source Analysis mode, don't store ai_response to ensure PDF uses source_analyses
