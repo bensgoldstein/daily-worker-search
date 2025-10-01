@@ -1099,124 +1099,36 @@ def safe_pdf_download_button(usage_monitor: UsageMonitor, **kwargs) -> bool:
     return False
 
 
-def get_surrounding_chunks(vector_db, result: SearchResult, num_before: int = 2, num_after: int = 2, cached_embedding=None) -> Dict[str, Any]:
-    """Get chunks before and after the main chunk for context."""
+def get_pdf_context(result: SearchResult) -> Dict[str, Any]:
+    """Get PDF context for the main chunk by fetching the source PDF URL."""
     meta = result.chunk.newspaper_metadata
-    # Convert main chunk index to int (might be float from Pinecone)
-    try:
-        main_chunk_index = int(result.chunk.chunk_index)
-    except (ValueError, TypeError):
-        logger.warning(f"Invalid main chunk_index: {result.chunk.chunk_index}")
-        return {"main_chunk": result, "before": [], "after": []}
     
-    surrounding = {
-        "main_chunk": result,
-        "before": [],
-        "after": []
-    }
+    # Get the Internet Archive URL
+    source_url = result.chunk.newspaper_metadata.source_url
+    if not source_url:
+        source_url = reconstruct_internet_archive_url(result)
     
-    try:
-        # Create target chunk indices
-        target_indices = []
-        for i in range(main_chunk_index - num_before, main_chunk_index + num_after + 1):
-            if i >= 0 and i != main_chunk_index:  # Don't include the main chunk itself
-                target_indices.append(i)
-        
-        if not target_indices:
-            return surrounding
+    if not source_url:
+        logger.warning(f"Could not reconstruct Internet Archive URL for chunk")
+        return {"main_chunk": result, "pdf_url": None}
+    
+    # Convert details URL to PDF URL
+    # Pattern: /details/ID/ -> /download/ID/ID.pdf
+    if "/details/" in source_url:
+        # Extract the ID from the details URL
+        parts = source_url.strip('/').split('/')
+        if parts[-2] == "details" and len(parts) >= 2:
+            archive_id = parts[-1]
+            # Construct PDF URL using the pattern you provided
+            pdf_url = f"https://dn721601.ca.archive.org/0/items/{archive_id}/{archive_id}.pdf"
             
-        # Query Pinecone for all surrounding chunks in a single request
-        try:
-            # Use Pinecone's $in operator to get all target chunks at once
-            metadata_filter = {
-                "newspaper_name": meta.newspaper_name,
-                "publication_date": meta.publication_date.isoformat(),
-                "chunk_index": {"$in": target_indices}
+            return {
+                "main_chunk": result,
+                "pdf_url": pdf_url,
+                "archive_url": source_url
             }
-            
-            # Use cached embedding or generate once
-            if cached_embedding is None:
-                dummy_query_embedding = vector_db.pc.inference.embed(
-                    model="multilingual-e5-large", 
-                    inputs=[""],
-                    parameters={"input_type": "query", "truncate": "END"}
-                )
-                query_vector = dummy_query_embedding[0].values
-            else:
-                query_vector = cached_embedding
-            
-            # Single query to get all surrounding chunks
-            search_results = vector_db.index.query(
-                vector=query_vector,
-                top_k=len(target_indices) * 2,  # Double to ensure we get all chunks
-                filter=metadata_filter,
-                include_metadata=True
-            )
-            
-            # Process results to find surrounding chunks
-            found_chunks = {}
-            for match in search_results.matches:
-                chunk_metadata = match.metadata
-                chunk_index_raw = chunk_metadata.get('chunk_index')
-                
-                # Convert to int if it's a float (Pinecone sometimes returns floats)
-                if chunk_index_raw is not None:
-                    try:
-                        chunk_index = int(chunk_index_raw)
-                    except (ValueError, TypeError):
-                        logger.warning(f"Invalid chunk_index: {chunk_index_raw}")
-                        continue
-                else:
-                    continue
-                
-                if chunk_index in target_indices:
-                    # Reconstruct the chunk
-                    try:
-                        pub_date = date.fromisoformat(chunk_metadata.get('publication_date', ''))
-                        # Convert page_number to int if it exists and is not None
-                        page_num_raw = chunk_metadata.get('page_number')
-                        page_number = int(page_num_raw) if page_num_raw is not None else None
-                        
-                        chunk_meta = NewspaperMetadata(
-                            newspaper_name=chunk_metadata.get('newspaper_name', ''),
-                            publication_date=pub_date,
-                            page_number=page_number,
-                            section=chunk_metadata.get('section')
-                        )
-                        
-                        chunk = DocumentChunk(
-                            chunk_id=match.id,
-                            content=chunk_metadata.get('text', ''),
-                            newspaper_metadata=chunk_meta,
-                            chunk_index=chunk_index,
-                            start_char=int(chunk_metadata.get('start_char', 0)),
-                            end_char=int(chunk_metadata.get('end_char', 0))
-                        )
-                        
-                        found_chunks[chunk_index] = chunk
-                        
-                    except Exception as e:
-                        logger.warning(f"Error reconstructing chunk {chunk_index}: {e}")
-                        continue
-            
-            # Sort chunks into before/after lists
-            for idx in range(main_chunk_index - num_before, main_chunk_index):
-                if idx in found_chunks:
-                    surrounding["before"].append(found_chunks[idx])
-                    
-            for idx in range(main_chunk_index + 1, main_chunk_index + num_after + 1):
-                if idx in found_chunks:
-                    surrounding["after"].append(found_chunks[idx])
-            
-            logger.debug(f"Found {len(surrounding['before'])} chunks before and {len(surrounding['after'])} chunks after main chunk {main_chunk_index}")
-            
-        except Exception as e:
-            logger.error(f"Error querying for surrounding chunks: {e}")
-            
-    except Exception as e:
-        logger.error(f"Error getting surrounding chunks: {e}")
     
-    return surrounding
+    return {"main_chunk": result, "pdf_url": None}
 
 
 def apply_source_diversification(results: List[SearchResult], diversity_weight: float = 0.3) -> List[SearchResult]:
@@ -1656,33 +1568,25 @@ def main():
                             elif response_mode == "Source Analysis":
                                 # New source analysis mode
                                 try:
-                                    with st.spinner(f"Analyzing {len(results)} sources with surrounding context..."):
+                                    with st.spinner(f"Analyzing {len(results)} sources with PDF context..."):
                                         response_gen = ResponseGenerator()
                                         
-                                        # Generate dummy embedding once for all surrounding chunk queries
-                                        dummy_embedding = vector_db.pc.inference.embed(
-                                            model="multilingual-e5-large", 
-                                            inputs=[""],
-                                            parameters={"input_type": "query", "truncate": "END"}
-                                        )
-                                        cached_embedding = dummy_embedding[0].values
-                                        
                                         for i, result in enumerate(results):
-                                            # Get surrounding chunks for each result
-                                            surrounding = get_surrounding_chunks(vector_db, result, context_chunks, context_chunks, cached_embedding)
+                                            # Get PDF context for each result
+                                            pdf_context = get_pdf_context(result)
                                             
                                             # Generate analysis for this source
                                             analysis = response_gen.generate_source_analysis(
                                                 enhanced_query_for_ai,
                                                 result,
-                                                surrounding
+                                                pdf_context
                                             )
                                             
                                             if analysis:
                                                 source_analyses.append({
                                                     'result': result,
                                                     'analysis': analysis,
-                                                    'surrounding': surrounding
+                                                    'pdf_context': pdf_context
                                                 })
                                         
                                         # Display source analyses

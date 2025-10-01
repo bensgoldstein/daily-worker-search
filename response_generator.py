@@ -122,33 +122,30 @@ If the Daily Worker sources don't contain enough information to fully answer the
         self,
         query: str,
         main_chunk,
-        surrounding_context: dict
+        pdf_context: dict
     ) -> Optional[str]:
-        """Generate analysis for a single source with surrounding context."""
+        """Generate analysis for a single source with PDF context."""
         
         if not self.model and self.provider != "openai":
             return None
             
-        # Build context from surrounding chunks
+        # Build context parts
         context_parts = []
-        
-        # Add before chunks
-        if surrounding_context["before"]:
-            context_parts.append("**Context Before:**")
-            for i, chunk in enumerate(surrounding_context["before"]):
-                context_parts.append(f"[Before-{i+1}] {chunk.content[:200]}...")
-            context_parts.append("")
         
         # Add main chunk
         context_parts.append("**Main Source (focus of analysis):**")
         context_parts.append(f"[MAIN] {main_chunk.chunk.content}")
         context_parts.append("")
         
-        # Add after chunks  
-        if surrounding_context["after"]:
-            context_parts.append("**Context After:**")
-            for i, chunk in enumerate(surrounding_context["after"]):
-                context_parts.append(f"[After-{i+1}] {chunk.content[:200]}...")
+        # Add PDF URL reference if available
+        if pdf_context.get("pdf_url"):
+            context_parts.append("**Full article available at:**")
+            context_parts.append(f"PDF: {pdf_context['pdf_url']}")
+            context_parts.append(f"Archive: {pdf_context.get('archive_url', 'N/A')}")
+            context_parts.append("")
+            context_parts.append("Please note: The AI can access and analyze the full PDF document to provide broader article context.")
+        else:
+            context_parts.append("**Note:** Full PDF context not available for this source.")
         
         context = "\n".join(context_parts)
         
@@ -180,7 +177,8 @@ If the Daily Worker sources don't contain enough information to fully answer the
         """Get the system prompt for source analysis mode."""
         return """You are a historical research assistant analyzing individual Daily Worker sources.
 Your task is to analyze how a specific source relates to a research question and provide context about the article.
-Focus on the MAIN source while using surrounding context to understand the broader article.
+When a PDF URL is provided, you should fetch and analyze the full document to understand the broader article context.
+Focus on the MAIN source chunk while using the full PDF to provide rich contextual understanding.
 Be concise but insightful in your analysis."""
     
     def _create_source_analysis_prompt(self, query: str, context: str, main_chunk) -> str:
@@ -192,11 +190,13 @@ Be concise but insightful in your analysis."""
 
 {context}
 
-Please analyze the MAIN source in relation to the research question. Provide:
+Please analyze the MAIN source in relation to the research question. If a PDF URL is provided above, fetch and analyze the full document to provide comprehensive context.
+
+Provide:
 
 1. **Relevance**: How does this source relate to the research question? (2-3 sentences)
 
-2. **Article Context**: Based on the surrounding content, what type of article is this and what is its broader focus? (2-3 sentences)
+2. **Article Context**: Based on the full PDF document (if available) or the provided text, what type of article is this and what is its broader focus? Include the article headline, author if available, and overall theme. (2-3 sentences)
 
 3. **Key Information**: What specific facts, dates, names, or events does this source contribute? (bullet points)
 
