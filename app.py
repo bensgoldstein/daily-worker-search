@@ -768,20 +768,39 @@ def generate_pdf_report(query_text: str, search_query: SearchQuery, results: Lis
                         if para.strip().startswith('-') or para.strip().startswith('•'):
                             para = f"• {para.strip()[1:].strip()}"
                         
-                        # Escape special characters for ReportLab
+                        # Escape special characters for ReportLab  
+                        # First handle ampersands
                         para = para.replace('&', '&amp;')
+                        # Then handle less than/greater than (but not in our bold tags)
+                        # Temporarily replace bold tags
+                        para = para.replace('<b>', '|||BOLD_START|||')
+                        para = para.replace('</b>', '|||BOLD_END|||')
+                        # Now escape < and >
                         para = para.replace('<', '&lt;').replace('>', '&gt;')
-                        # But keep our bold tags
-                        para = para.replace('&lt;b&gt;', '<b>').replace('&lt;/b&gt;', '</b>')
+                        # Restore bold tags
+                        para = para.replace('|||BOLD_START|||', '<b>')
+                        para = para.replace('|||BOLD_END|||', '</b>')
                         
                         try:
-                            content.append(Paragraph(para, styles['Normal']))
+                            p = Paragraph(para, styles['Normal'])
+                            content.append(p)
                             content.append(Spacer(1, 6))
+                            logger.debug(f"Successfully added paragraph {len(content)} to PDF")
                         except Exception as e:
                             logger.error(f"Error adding paragraph to PDF: {e}")
-                            # Fallback to plain text
-                            content.append(Paragraph(para.replace('<b>', '').replace('</b>', ''), styles['Normal']))
-                            content.append(Spacer(1, 6))
+                            logger.error(f"Problematic paragraph text: {para[:200]}...")
+                            # Try simpler fallback - strip all tags and special chars
+                            fallback_text = re.sub(r'<[^>]+>', '', para)
+                            fallback_text = fallback_text.replace('&amp;', '&').replace('&lt;', '<').replace('&gt;', '>')
+                            try:
+                                content.append(Paragraph(fallback_text, styles['Normal']))
+                                content.append(Spacer(1, 6))
+                                logger.info("Fallback paragraph succeeded")
+                            except Exception as e2:
+                                logger.error(f"Even fallback failed: {e2}")
+                                # Last resort - add as plain text
+                                content.append(Paragraph("Error displaying this section", styles['Normal']))
+                                content.append(Spacer(1, 6))
             else:
                 logger.warning(f"PDF - No analysis found for source {i}")
             
@@ -863,7 +882,13 @@ def generate_pdf_report(query_text: str, search_query: SearchQuery, results: Lis
     content.append(Paragraph(footer_text, footer_style))
     
     # Build PDF
-    doc.build(content)
+    logger.info(f"PDF - Building document with {len(content)} content items")
+    try:
+        doc.build(content)
+        logger.info("PDF - Document built successfully")
+    except Exception as e:
+        logger.error(f"PDF - Error building document: {e}")
+        raise
     buffer.seek(0)
     return buffer
 
