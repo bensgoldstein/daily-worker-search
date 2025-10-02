@@ -528,29 +528,47 @@ def generate_full_conversation_pdf() -> BytesIO:
             
             # Show detailed source information
             for j, result in enumerate(exchange['sources'], 1):
-                # Source header
-                source_header = f"Source {j}: {result.chunk.newspaper_metadata.newspaper_name} " \
-                               f"(Relevance: {int(result.relevance_score * 100)}%)"
-                content.append(Paragraph(source_header, styles['Heading4']))
-                
-                # Citation
-                citation = result.format_citation()
-                content.append(Paragraph(f"<b>Citation:</b> {citation}", styles['Normal']))
-                
-                # Internet Archive link
-                source_url = result.chunk.newspaper_metadata.source_url
-                if not source_url:
-                    source_url = reconstruct_internet_archive_url(result)
-                if source_url:
-                    content.append(Paragraph(f"<b>Source URL:</b> <link href='{source_url}'>{source_url}</link>", styles['Normal']))
-                
-                # Content excerpt (shorter for conversation PDF)
-                content_text = result.chunk.content
-                if len(content_text) > 400:
-                    content_text = content_text[:400] + "..."
-                
-                content.append(Paragraph(f"<b>Content:</b> {content_text}", styles['Normal']))
-                content.append(Spacer(1, 8))
+                try:
+                    # Source header - escape HTML
+                    import html
+                    newspaper_name = html.escape(result.chunk.newspaper_metadata.newspaper_name)
+                    source_header = f"Source {j}: {newspaper_name} " \
+                                   f"(Relevance: {int(result.relevance_score * 100)}%)"
+                    content.append(Paragraph(source_header, styles['Heading4']))
+                    
+                    # Citation - escape HTML
+                    citation = html.escape(result.format_citation())
+                    content.append(Paragraph(f"<b>Citation:</b> {citation}", styles['Normal']))
+                    
+                    # Internet Archive link
+                    source_url = result.chunk.newspaper_metadata.source_url
+                    if not source_url:
+                        source_url = reconstruct_internet_archive_url(result)
+                    if source_url:
+                        try:
+                            safe_url = html.escape(source_url, quote=False)
+                            content.append(Paragraph(f"<b>Source URL:</b> <link href='{safe_url}'>{safe_url}</link>", styles['Normal']))
+                        except:
+                            content.append(Paragraph(f"<b>Source URL:</b> {source_url}", styles['Normal']))
+                    
+                    # Content excerpt (shorter for conversation PDF) - ESCAPE HTML!
+                    content_text = result.chunk.content
+                    if len(content_text) > 400:
+                        content_text = content_text[:400] + "..."
+                    
+                    # Clean and escape content for PDF
+                    import re
+                    # Remove any existing HTML tags
+                    content_text = re.sub(r'<[^>]+>', '', content_text)
+                    # Escape remaining special characters
+                    content_text = html.escape(content_text)
+                    
+                    content.append(Paragraph(f"<b>Content:</b> {content_text}", styles['Normal']))
+                    content.append(Spacer(1, 8))
+                except Exception as e:
+                    logger.error(f"Error adding source {j} in Sources Referenced section: {e}")
+                    # Skip this source if there's an error
+                    continue
         
         elif exchange.get('source_ids'):
             # Fallback for older entries
