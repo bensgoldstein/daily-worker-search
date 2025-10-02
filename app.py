@@ -42,6 +42,16 @@ try:
 except ImportError:
     PDF_AVAILABLE = False
 
+# Try to import Excel generation libraries
+try:
+    import pandas as pd
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, Alignment, PatternFill
+    from openpyxl.utils.dataframe import dataframe_to_rows
+    EXCEL_AVAILABLE = True
+except ImportError:
+    EXCEL_AVAILABLE = False
+
 # Page configuration
 st.set_page_config(
     page_title="Historical Newspaper Search",
@@ -1261,6 +1271,243 @@ def get_pdf_context(result: SearchResult) -> Dict[str, Any]:
     return {"main_chunk": result, "pdf_url": None}
 
 
+def generate_source_analysis_excel(source_analyses: List[Dict], query_text: str = "") -> BytesIO:
+    """Generate Excel file for source analysis results with source number, URL, and date columns."""
+    if not EXCEL_AVAILABLE:
+        raise ImportError("Excel generation not available. Install openpyxl: pip install openpyxl")
+    
+    if not source_analyses:
+        raise ValueError("No source analyses available")
+    
+    # Prepare data for Excel
+    data = []
+    for i, analysis_data in enumerate(source_analyses):
+        result = analysis_data['result']
+        meta = result.chunk.newspaper_metadata
+        
+        # Get the URL
+        source_url = meta.source_url
+        if not source_url:
+            source_url = reconstruct_internet_archive_url(result)
+        
+        # Format date for Excel sorting (YYYY-MM-DD format)
+        excel_date = meta.publication_date.strftime('%Y-%m-%d')
+        
+        data.append({
+            'Source Number': i + 1,
+            'URL': source_url or 'N/A',
+            'Date': excel_date,
+            'Citation': result.format_citation(),
+            'Newspaper': meta.newspaper_name,
+            'Page': meta.page_number or 'N/A',
+            'Section': meta.section or 'N/A'
+        })
+    
+    # Create DataFrame
+    df = pd.DataFrame(data)
+    
+    # Create Excel file in memory
+    buffer = BytesIO()
+    with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
+        # Write data to Excel
+        df.to_excel(writer, sheet_name='Source Analysis', index=False)
+        
+        # Get the workbook and worksheet to apply formatting
+        workbook = writer.book
+        worksheet = writer.sheets['Source Analysis']
+        
+        # Apply formatting
+        header_font = Font(bold=True, color='FFFFFF')
+        header_fill = PatternFill(start_color='2a5298', end_color='2a5298', fill_type='solid')
+        
+        # Format headers
+        for col in range(1, len(df.columns) + 1):
+            cell = worksheet.cell(row=1, column=col)
+            cell.font = header_font
+            cell.fill = header_fill
+            cell.alignment = Alignment(horizontal='center')
+        
+        # Auto-adjust column widths
+        for column in worksheet.columns:
+            max_length = 0
+            column_letter = column[0].column_letter
+            
+            for cell in column:
+                try:
+                    if len(str(cell.value)) > max_length:
+                        max_length = len(str(cell.value))
+                except:
+                    pass
+            
+            # Set width with some padding, max 50 chars for URLs
+            adjusted_width = min(max_length + 2, 50)
+            worksheet.column_dimensions[column_letter].width = adjusted_width
+        
+        # Add metadata sheet with query info
+        meta_data = [
+            ['Query', query_text],
+            ['Generated', datetime.now().strftime('%Y-%m-%d %H:%M:%S')],
+            ['Total Sources', len(source_analyses)],
+            ['Date Range', f"{df['Date'].min()} to {df['Date'].max()}"]
+        ]
+        
+        meta_df = pd.DataFrame(meta_data, columns=['Field', 'Value'])
+        meta_df.to_excel(writer, sheet_name='Query Info', index=False)
+        
+        # Format metadata sheet
+        meta_worksheet = writer.sheets['Query Info']
+        for col in range(1, 3):
+            cell = meta_worksheet.cell(row=1, column=col)
+            cell.font = header_font
+            cell.fill = header_fill
+            cell.alignment = Alignment(horizontal='center')
+        
+        # Auto-adjust metadata sheet columns
+        for column in meta_worksheet.columns:
+            max_length = 0
+            column_letter = column[0].column_letter
+            
+            for cell in column:
+                try:
+                    if len(str(cell.value)) > max_length:
+                        max_length = len(str(cell.value))
+                except:
+                    pass
+            
+            adjusted_width = max_length + 2
+            meta_worksheet.column_dimensions[column_letter].width = adjusted_width
+    
+    buffer.seek(0)
+    return buffer
+
+
+def generate_conversation_excel() -> BytesIO:
+    """Generate Excel file for full conversation if it contains only source analysis searches."""
+    if not EXCEL_AVAILABLE:
+        raise ImportError("Excel generation not available. Install openpyxl: pip install openpyxl")
+    
+    if not st.session_state.conversation_history:
+        raise ValueError("No conversation history available")
+    
+    # Check if all entries are source analysis
+    all_source_analysis = all(
+        entry.get('response_mode') == 'Source Analysis' 
+        for entry in st.session_state.conversation_history
+    )
+    
+    if not all_source_analysis:
+        raise ValueError("Conversation contains non-source analysis exchanges")
+    
+    # Prepare data for all exchanges
+    all_data = []
+    
+    for exchange_idx, entry in enumerate(st.session_state.conversation_history):
+        exchange_num = exchange_idx + 1
+        query_text = entry['query']
+        source_analyses = entry.get('source_analyses', [])
+        
+        for source_idx, analysis_data in enumerate(source_analyses):
+            result = analysis_data['result']
+            meta = result.chunk.newspaper_metadata
+            
+            # Get the URL
+            source_url = meta.source_url
+            if not source_url:
+                source_url = reconstruct_internet_archive_url(result)
+            
+            # Format date for Excel sorting
+            excel_date = meta.publication_date.strftime('%Y-%m-%d')
+            
+            all_data.append({
+                'Exchange': exchange_num,
+                'Query': query_text,
+                'Source Number': source_idx + 1,
+                'URL': source_url or 'N/A',
+                'Date': excel_date,
+                'Citation': result.format_citation(),
+                'Newspaper': meta.newspaper_name,
+                'Page': meta.page_number or 'N/A',
+                'Section': meta.section or 'N/A'
+            })
+    
+    # Create DataFrame
+    df = pd.DataFrame(all_data)
+    
+    # Create Excel file in memory
+    buffer = BytesIO()
+    with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
+        # Write data to Excel
+        df.to_excel(writer, sheet_name='Full Conversation', index=False)
+        
+        # Get the workbook and worksheet to apply formatting
+        workbook = writer.book
+        worksheet = writer.sheets['Full Conversation']
+        
+        # Apply formatting
+        header_font = Font(bold=True, color='FFFFFF')
+        header_fill = PatternFill(start_color='2a5298', end_color='2a5298', fill_type='solid')
+        
+        # Format headers
+        for col in range(1, len(df.columns) + 1):
+            cell = worksheet.cell(row=1, column=col)
+            cell.font = header_font
+            cell.fill = header_fill
+            cell.alignment = Alignment(horizontal='center')
+        
+        # Auto-adjust column widths
+        for column in worksheet.columns:
+            max_length = 0
+            column_letter = column[0].column_letter
+            
+            for cell in column:
+                try:
+                    if len(str(cell.value)) > max_length:
+                        max_length = len(str(cell.value))
+                except:
+                    pass
+            
+            # Set width with some padding, max 50 chars for URLs
+            adjusted_width = min(max_length + 2, 50)
+            worksheet.column_dimensions[column_letter].width = adjusted_width
+        
+        # Add summary sheet
+        summary_data = [
+            ['Total Exchanges', len(st.session_state.conversation_history)],
+            ['Total Sources', len(all_data)],
+            ['Date Range', f"{df['Date'].min()} to {df['Date'].max()}"],
+            ['Generated', datetime.now().strftime('%Y-%m-%d %H:%M:%S')]
+        ]
+        
+        summary_df = pd.DataFrame(summary_data, columns=['Field', 'Value'])
+        summary_df.to_excel(writer, sheet_name='Summary', index=False)
+        
+        # Format summary sheet
+        summary_worksheet = writer.sheets['Summary']
+        for col in range(1, 3):
+            cell = summary_worksheet.cell(row=1, column=col)
+            cell.font = header_font
+            cell.fill = header_fill
+            cell.alignment = Alignment(horizontal='center')
+        
+        # Auto-adjust summary sheet columns
+        for column in summary_worksheet.columns:
+            max_length = 0
+            column_letter = column[0].column_letter
+            
+            for cell in column:
+                try:
+                    if len(str(cell.value)) > max_length:
+                        max_length = len(str(cell.value))
+                except:
+                    pass
+            
+            adjusted_width = max_length + 2
+            summary_worksheet.column_dimensions[column_letter].width = adjusted_width
+    
+    buffer.seek(0)
+    return buffer
+
+
 def apply_source_diversification(results: List[SearchResult], diversity_weight: float = 0.3) -> List[SearchResult]:
     """Apply source diversification by penalizing previously used sources."""
     if not st.session_state.used_sources:
@@ -1842,6 +2089,28 @@ def main():
                         else:
                             st.info("PDF download requires reportlab library. Install with: pip install reportlab")
                         
+                        # Add Excel download button for Source Analysis mode
+                        if response_mode == "Source Analysis" and source_analyses and EXCEL_AVAILABLE:
+                            try:
+                                excel_buffer = generate_source_analysis_excel(source_analyses, query_text)
+                                
+                                if st.download_button(
+                                    label="Download Source Analysis as Excel",
+                                    data=excel_buffer.getvalue(),
+                                    file_name=f"source_analysis_{st.session_state.last_search['timestamp']}.xlsx",
+                                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                                    help="Download source analysis results as Excel spreadsheet with source numbers, URLs, and dates",
+                                    key="excel_download"
+                                ):
+                                    # This block runs after download, but we don't need to do anything
+                                    pass
+                                    
+                            except Exception as e:
+                                logger.error(f"Excel generation error: {e}")
+                                st.warning("Excel generation temporarily unavailable.")
+                        elif response_mode == "Source Analysis" and source_analyses and not EXCEL_AVAILABLE:
+                            st.info("Excel download requires openpyxl library. Install with: pip install openpyxl")
+                        
                     else:
                         st.info("No results found matching your search criteria. Try adjusting your filters or search terms.")
                 
@@ -1869,8 +2138,8 @@ def main():
     # Render conversation history in the placeholder at the top
     with conversation_history_placeholder.container():
         if st.session_state.conversation_history:
-            # Add download button for full conversation PDF
-            col1, col2 = st.columns([1, 4])
+            # Add download buttons for full conversation PDF and Excel
+            col1, col2 = st.columns([1, 1])
             with col1:
                 if PDF_AVAILABLE:
                     try:
@@ -1890,6 +2159,34 @@ def main():
                         st.error(f"Error generating conversation PDF: {e}")
                 else:
                     st.info("Install reportlab for PDF download")
+            
+            with col2:
+                # Check if all entries are source analysis for Excel download
+                all_source_analysis = all(
+                    entry.get('response_mode') == 'Source Analysis' 
+                    for entry in st.session_state.conversation_history
+                )
+                
+                if all_source_analysis and EXCEL_AVAILABLE:
+                    try:
+                        conversation_excel_buffer = generate_conversation_excel()
+                        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                        filename = f"full_conversation_{timestamp}.xlsx"
+                        
+                        st.download_button(
+                            label="Download Full Conversation Excel",
+                            data=conversation_excel_buffer.getvalue(),
+                            file_name=filename,
+                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                            help="Download complete conversation history as Excel (source analysis only)",
+                            use_container_width=True
+                        )
+                    except Exception as e:
+                        st.error(f"Error generating conversation Excel: {e}")
+                elif all_source_analysis and not EXCEL_AVAILABLE:
+                    st.info("Install openpyxl for Excel download")
+                elif not all_source_analysis:
+                    st.info("Excel export available for source analysis conversations only")
             
             with st.expander(f"Conversation History ({len(st.session_state.conversation_history)} exchanges)", expanded=False):
                 for i, entry in enumerate(st.session_state.conversation_history):
