@@ -1740,10 +1740,10 @@ def main():
                                     
                                     # Process all sources in parallel
                                     with concurrent.futures.ThreadPoolExecutor(max_workers=25) as executor:
-                                            # Submit all tasks
-                                            future_to_result = {
-                                                executor.submit(analyze_single_source, result): i 
-                                                for i, result in enumerate(results)
+                                        # Submit all tasks
+                                        future_to_result = {
+                                            executor.submit(analyze_single_source, result): i 
+                                            for i, result in enumerate(results)
                                         }
                                         
                                         # Collect results as they complete
