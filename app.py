@@ -804,6 +804,14 @@ def generate_pdf_report(query_text: str, search_query: SearchQuery, results: Lis
             header_text = f"Source {i}: {result.chunk.newspaper_metadata.newspaper_name} - {result.format_citation()}"
             content.append(Paragraph(header_text, styles['Heading3']))
             
+            # Add Internet Archive link if available
+            source_url = result.chunk.newspaper_metadata.source_url
+            if not source_url:
+                source_url = reconstruct_internet_archive_url(result)
+            if source_url:
+                content.append(Paragraph(f"<b>Source:</b> <link href='{source_url}'>{source_url}</link>", styles['Normal']))
+                content.append(Spacer(1, 6))
+            
             # Parse and format the analysis
             if analysis:
                 logger.info(f"PDF - Processing analysis for source {i}: {len(analysis)} chars")
