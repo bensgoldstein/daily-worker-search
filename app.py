@@ -1645,6 +1645,18 @@ def main():
                         # Record the search for usage tracking
                         usage_monitor.record_search(used_ai=use_ai_enhancement)
                         
+                        # Create placeholder for AI content at the top
+                        ai_placeholder = st.empty()
+                        
+                        # Show AI processing status in placeholder if AI is enabled
+                        if use_ai_enhancement and config.GEMINI_API_KEY:
+                            if response_mode == "Essay Generation":
+                                with ai_placeholder.container():
+                                    st.info("🔄 Generating AI summary... This will appear here when ready.")
+                            else:  # Source Analysis
+                                with ai_placeholder.container():
+                                    st.info(f"🔄 Analyzing {len(results)} sources with PDF context... This will appear here when ready.")
+                        
                         # Display results immediately for better UX
                         st.markdown("### Search Results")
                         
@@ -1655,10 +1667,6 @@ def main():
                                 unsafe_allow_html=True
                             )
                         
-                        # Create placeholders for AI content that will be filled later
-                        ai_placeholder = st.empty()
-                        source_analysis_placeholder = st.empty()
-                        
                         # Handle different response modes
                         ai_response = None
                         source_analyses = []
@@ -1667,13 +1675,12 @@ def main():
                             if response_mode == "Essay Generation":
                                 # Traditional essay generation mode
                                 try:
-                                    with st.spinner("Generating AI summary..."):
-                                        response_gen = ResponseGenerator()
-                                        ai_response = response_gen.generate_response(
-                                            enhanced_query_for_ai,  # Use enhanced query for AI
-                                            results,
-                                            max_results_to_use=min(max_results, len(results))
-                                        )
+                                    response_gen = ResponseGenerator()
+                                    ai_response = response_gen.generate_response(
+                                        enhanced_query_for_ai,  # Use enhanced query for AI
+                                        results,
+                                        max_results_to_use=min(max_results, len(results))
+                                    )
                                         
                                     if ai_response:
                                         # Use the placeholder to add AI summary at the top
@@ -1695,16 +1702,15 @@ def main():
                             elif response_mode == "Source Analysis":
                                 # New source analysis mode
                                 try:
-                                    with st.spinner(f"Analyzing {len(results)} sources with PDF context..."):
-                                        import concurrent.futures
-                                        import threading
-                                        
-                                        response_gen = ResponseGenerator()
-                                        
-                                        # Create a thread-local storage for response generators
-                                        thread_local = threading.local()
-                                        
-                                        def analyze_single_source(result):
+                                    import concurrent.futures
+                                    import threading
+                                    
+                                    response_gen = ResponseGenerator()
+                                    
+                                    # Create a thread-local storage for response generators
+                                    thread_local = threading.local()
+                                    
+                                    def analyze_single_source(result):
                                             """Analyze a single source in parallel."""
                                             try:
                                                 # Each thread gets its own ResponseGenerator instance
@@ -1731,26 +1737,26 @@ def main():
                                             except Exception as e:
                                                 logger.error(f"Error analyzing source: {e}")
                                                 return None
-                                        
-                                        # Process all sources in parallel
-                                        with concurrent.futures.ThreadPoolExecutor(max_workers=25) as executor:
+                                    
+                                    # Process all sources in parallel
+                                    with concurrent.futures.ThreadPoolExecutor(max_workers=25) as executor:
                                             # Submit all tasks
                                             future_to_result = {
                                                 executor.submit(analyze_single_source, result): i 
                                                 for i, result in enumerate(results)
-                                            }
-                                            
-                                            # Collect results as they complete
-                                            for future in concurrent.futures.as_completed(future_to_result):
-                                                result_data = future.result()
-                                                if result_data:
-                                                    source_analyses.append(result_data)
+                                        }
                                         
-                                        # Sort analyses by original order
-                                        source_analyses.sort(key=lambda x: results.index(x['result']))
-                                        
-                                        # Display source analyses in placeholder
-                                        if source_analyses:
+                                        # Collect results as they complete
+                                        for future in concurrent.futures.as_completed(future_to_result):
+                                            result_data = future.result()
+                                            if result_data:
+                                                source_analyses.append(result_data)
+                                    
+                                    # Sort analyses by original order
+                                    source_analyses.sort(key=lambda x: results.index(x['result']))
+                                    
+                                    # Display source analyses in placeholder
+                                    if source_analyses:
                                             with ai_placeholder.container():
                                                 st.markdown("### Source Analysis")
                                                 for i, analysis_data in enumerate(source_analyses):
