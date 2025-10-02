@@ -1645,6 +1645,20 @@ def main():
                         # Record the search for usage tracking
                         usage_monitor.record_search(used_ai=use_ai_enhancement)
                         
+                        # Display results immediately for better UX
+                        st.markdown("### Search Results")
+                        
+                        # Display all results right away
+                        for i, result in enumerate(results, 1):
+                            st.markdown(
+                                format_search_result(result, i),
+                                unsafe_allow_html=True
+                            )
+                        
+                        # Create placeholders for AI content that will be filled later
+                        ai_placeholder = st.empty()
+                        source_analysis_placeholder = st.empty()
+                        
                         # Handle different response modes
                         ai_response = None
                         source_analyses = []
@@ -1662,8 +1676,9 @@ def main():
                                         )
                                         
                                     if ai_response:
-                                        st.markdown("### AI Summary")
-                                        with st.container():
+                                        # Use the placeholder to add AI summary at the top
+                                        with ai_placeholder.container():
+                                            st.markdown("### AI Summary")
                                             # Make source references clickable
                                             clickable_response = make_source_references_clickable(ai_response, results)
                                             st.markdown(
@@ -1672,7 +1687,7 @@ def main():
                                                 f'{clickable_response}</div>',
                                                 unsafe_allow_html=True
                                             )
-                                        st.markdown("---")
+                                            st.markdown("---")
                                                 
                                 except Exception as e:
                                     st.error(f"Error generating AI summary: {e}")
@@ -1734,24 +1749,25 @@ def main():
                                         # Sort analyses by original order
                                         source_analyses.sort(key=lambda x: results.index(x['result']))
                                         
-                                        # Display source analyses
+                                        # Display source analyses in placeholder
                                         if source_analyses:
-                                            st.markdown("### Source Analysis")
-                                            for i, analysis_data in enumerate(source_analyses):
-                                                result = analysis_data['result']
-                                                analysis = analysis_data['analysis']
-                                                
-                                                # Create expandable section for each source
-                                                with st.expander(f"Source {i+1}: {result.chunk.newspaper_metadata.newspaper_name} - {result.format_citation()}", expanded=i<3):
-                                                    st.markdown(analysis)
+                                            with ai_placeholder.container():
+                                                st.markdown("### Source Analysis")
+                                                for i, analysis_data in enumerate(source_analyses):
+                                                    result = analysis_data['result']
+                                                    analysis = analysis_data['analysis']
                                                     
-                                                    # Add link to Internet Archive if available
-                                                    source_url = result.chunk.newspaper_metadata.source_url
-                                                    if not source_url:
-                                                        source_url = reconstruct_internet_archive_url(result)
-                                                    if source_url:
-                                                        st.markdown(f"📰 [View on Internet Archive]({source_url})")
-                                            st.markdown("---")
+                                                    # Create expandable section for each source
+                                                    with st.expander(f"Source {i+1}: {result.chunk.newspaper_metadata.newspaper_name} - {result.format_citation()}", expanded=i<3):
+                                                        st.markdown(analysis)
+                                                        
+                                                        # Add link to Internet Archive if available
+                                                        source_url = result.chunk.newspaper_metadata.source_url
+                                                        if not source_url:
+                                                            source_url = reconstruct_internet_archive_url(result)
+                                                        if source_url:
+                                                            st.markdown(f"📰 [View on Internet Archive]({source_url})")
+                                                st.markdown("---")
                                                 
                                 except Exception as e:
                                     st.error(f"Error generating source analysis: {e}")
@@ -1820,14 +1836,6 @@ def main():
                         else:
                             st.info("PDF download requires reportlab library. Install with: pip install reportlab")
                         
-                        # Display results
-                        st.markdown("### Search Results")
-                        
-                        for i, result in enumerate(results, 1):
-                            st.markdown(
-                                format_search_result(result, i),
-                                unsafe_allow_html=True
-                            )
                     else:
                         st.info("No results found matching your search criteria. Try adjusting your filters or search terms.")
                 
