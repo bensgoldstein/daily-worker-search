@@ -1300,7 +1300,8 @@ def generate_source_analysis_excel(source_analyses: List[Dict], query_text: str 
             'Citation': result.format_citation(),
             'Newspaper': meta.newspaper_name,
             'Page': meta.page_number or 'N/A',
-            'Section': meta.section or 'N/A'
+            'Section': meta.section or 'N/A',
+            'AI Analysis': analysis_data.get('analysis', 'N/A')
         })
     
     # Create DataFrame
@@ -1331,6 +1332,7 @@ def generate_source_analysis_excel(source_analyses: List[Dict], query_text: str 
         for column in worksheet.columns:
             max_length = 0
             column_letter = column[0].column_letter
+            header_value = str(column[0].value) if column[0].value else ''
             
             for cell in column:
                 try:
@@ -1339,9 +1341,23 @@ def generate_source_analysis_excel(source_analyses: List[Dict], query_text: str 
                 except:
                     pass
             
-            # Set width with some padding, max 50 chars for URLs
-            adjusted_width = min(max_length + 2, 50)
-            worksheet.column_dimensions[column_letter].width = adjusted_width
+            # Special handling for different columns
+            if header_value == 'AI Analysis':
+                # AI Analysis column gets wider and text wrapping
+                adjusted_width = min(max_length + 2, 100)  # Max 100 chars wide
+                worksheet.column_dimensions[column_letter].width = adjusted_width
+                # Enable text wrapping for AI Analysis column
+                for cell in column:
+                    if cell.row > 1:  # Skip header
+                        cell.alignment = Alignment(wrap_text=True, vertical='top')
+            elif header_value == 'URL':
+                # URL column max 50 chars
+                adjusted_width = min(max_length + 2, 50)
+                worksheet.column_dimensions[column_letter].width = adjusted_width
+            else:
+                # Other columns max 30 chars
+                adjusted_width = min(max_length + 2, 30)
+                worksheet.column_dimensions[column_letter].width = adjusted_width
         
         # Add metadata sheet with query info
         meta_data = [
@@ -1427,7 +1443,8 @@ def generate_conversation_excel() -> BytesIO:
                 'Citation': result.format_citation(),
                 'Newspaper': meta.newspaper_name,
                 'Page': meta.page_number or 'N/A',
-                'Section': meta.section or 'N/A'
+                'Section': meta.section or 'N/A',
+                'AI Analysis': analysis_data.get('analysis', 'N/A')
             })
     
     # Create DataFrame
@@ -1458,6 +1475,7 @@ def generate_conversation_excel() -> BytesIO:
         for column in worksheet.columns:
             max_length = 0
             column_letter = column[0].column_letter
+            header_value = str(column[0].value) if column[0].value else ''
             
             for cell in column:
                 try:
@@ -1466,9 +1484,23 @@ def generate_conversation_excel() -> BytesIO:
                 except:
                     pass
             
-            # Set width with some padding, max 50 chars for URLs
-            adjusted_width = min(max_length + 2, 50)
-            worksheet.column_dimensions[column_letter].width = adjusted_width
+            # Special handling for different columns
+            if header_value == 'AI Analysis':
+                # AI Analysis column gets wider and text wrapping
+                adjusted_width = min(max_length + 2, 100)  # Max 100 chars wide
+                worksheet.column_dimensions[column_letter].width = adjusted_width
+                # Enable text wrapping for AI Analysis column
+                for cell in column:
+                    if cell.row > 1:  # Skip header
+                        cell.alignment = Alignment(wrap_text=True, vertical='top')
+            elif header_value == 'URL':
+                # URL column max 50 chars
+                adjusted_width = min(max_length + 2, 50)
+                worksheet.column_dimensions[column_letter].width = adjusted_width
+            else:
+                # Other columns max 30 chars
+                adjusted_width = min(max_length + 2, 30)
+                worksheet.column_dimensions[column_letter].width = adjusted_width
         
         # Add summary sheet
         summary_data = [
