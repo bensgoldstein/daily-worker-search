@@ -113,7 +113,14 @@ st.markdown("""
 st.markdown("""
 The AI-powered Daily Worker Search Database provides access to **over 9,900 digitized newspaper issues** from the Daily Worker and The Worker, 
 spanning **34 years of coverage** from 1924 to 1958. This comprehensive archive captures crucial decades of American labor 
-history, social movements, and political developments. Use this guide to make the most of your searches.
+history, social movements, and political developments through the lens of the Communist Party USA's primary publication.
+
+**What You Can Do:**
+- Search using natural language questions or specific keywords
+- Get AI-powered analysis and synthesis of historical sources
+- Export results to PDF or Excel with complete source analysis
+- Build conversational searches that build on previous queries
+- Access direct links to original newspaper pages on Internet Archive
 """)
 
 # Search Methods
@@ -123,36 +130,75 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-col1, col2, col3 = st.columns(3)
+st.markdown("""
+**The system uses advanced semantic search** that combines AI understanding with keyword matching to find the most relevant results. 
+Simply ask questions in natural language - no need to worry about search types or technical settings.
+
+### How to Search
+- **Ask complete questions**: "How did the Daily Worker cover the 1935 Wagner Act?"
+- **Use natural language**: "What was the paper's stance on Roosevelt's New Deal?"
+- **Be conversational**: "How did women's roles in labor organizing change over time?"
+- **Follow up**: After one search, ask related questions to build deeper understanding
+
+### Search Examples That Work Well
+""")
+
+col1, col2 = st.columns(2)
 
 with col1:
-    st.subheader("Hybrid Search (Recommended)")
     st.markdown("""
-    **Best for comprehensive searches**
-    - Combines semantic understanding with keyword matching
-    - Finds related concepts even if exact words aren't used
-    - Ask full questions: "How did workers respond to the Great Depression?"
-    - Example: "What was the Daily Worker's position on the Spanish Civil War?"
+    **Historical Events**
+    - "How did the Daily Worker report on the Stock Market Crash of 1929?"
+    - "What was the paper's coverage of the Spanish Civil War?"
+    - "How did the Daily Worker discuss World War II before US entry?"
     """)
 
 with col2:
-    st.subheader("Semantic Search")
     st.markdown("""
-    **Best for natural language questions**
-    - Understands meaning and context
-    - Ask complete questions in natural language
-    - Example: "How did unemployment affect working families during the 1930s?"
-    - Try: "What were the main criticisms of Roosevelt's New Deal policies?"
+    **Social & Political Issues**
+    - "What strategies for union organizing were promoted in the 1930s?"
+    - "How did the Daily Worker address racial discrimination?"
+    - "What was the paper's relationship with the Socialist Party?"
     """)
 
-with col3:
-    st.subheader("Keyword Search")
+# Response Modes
+st.markdown("""
+<div class="section-header">
+    <h2>Response Modes: Essay vs Source Analysis</h2>
+</div>
+""", unsafe_allow_html=True)
+
+col1, col2 = st.columns(2)
+
+with col1:
+    st.subheader("📝 Essay Generation Mode")
     st.markdown("""
-    **Best for exact terms**
-    - Traditional keyword matching
-    - Finds exact words and phrases
-    - Example: Search "John Smith" to find that specific name
+    **Best for comprehensive research questions**
+    - AI synthesizes information from multiple sources
+    - Provides a cohesive, essay-style answer
+    - Sources cited as [Source 1], [Source 2], etc.
+    - Great for understanding topics across time
+    - **Example output**: A detailed analysis drawing from 5-10 sources
     """)
+
+with col2:
+    st.subheader("🔍 Source Analysis Mode")
+    st.markdown("""
+    **Best for detailed source examination**
+    - AI analyzes each source individually
+    - Expandable sections for each newspaper source
+    - Detailed analysis of how each source relates to your question
+    - Perfect for academic research and citation
+    - **Excel export available** with complete analysis
+    """)
+
+st.markdown("""
+<div class="tip-box">
+<strong>Excel Export:</strong> In Source Analysis mode, you can download a comprehensive Excel spreadsheet containing 
+source numbers, URLs, dates, citations, newspaper names, and the complete AI analysis for each source. Perfect for 
+academic research, citation management, and detailed documentation.
+</div>
+""", unsafe_allow_html=True)
 
 # Search Tips
 st.markdown("""
@@ -189,23 +235,29 @@ coverage of strikes evolve between 1930 and 1940?" for rich, contextual response
 </div>
 """, unsafe_allow_html=True)
 
-# Filters and Advanced Options
+# Filters and Options
 st.markdown("""
 <div class="section-header">
-    <h2>Filters and Advanced Options</h2>
+    <h2>Search Filters and Options</h2>
 </div>
 """, unsafe_allow_html=True)
 
 st.markdown("""
 ### Date Range Filtering
-- **Default**: Last 100 years from today
-- **Custom ranges**: Set specific start and end dates
-- **Historical context**: Remember publication dates span from early 1900s onward
+- **Default**: Full coverage (1924-1958) - spans entire Daily Worker archive
+- **Custom ranges**: Set specific start and end dates for focused research
+- **Historical periods**: Great for studying specific eras like the Great Depression (1929-1939)
 
-### Advanced Settings
-- **Maximum Results**: Control how many results to display (5-50)
+### Search Options
+- **Maximum Results**: Control how many sources to display (5-50)
 - **Relevance Threshold**: Filter out low-relevance results (0.0-1.0)
-- **AI Enhancement**: Generate comprehensive summaries using Gemini AI
+- **Response Mode**: Choose between Essay Generation or Source Analysis
+- **AI Enhancement**: Powered by Gemini AI for intelligent analysis
+
+### Export Options
+- **PDF Reports**: Download formatted reports with all results and AI analysis
+- **Excel Spreadsheets**: Export source analysis with URLs, dates, and complete AI analysis
+- **Conversation History**: Save entire research sessions for later reference
 """)
 
 # Understanding Results
@@ -216,25 +268,38 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.markdown("""
-### Result Information
+### Search Results Display
 Each search result shows:
-- **Source Number**: Sequential numbering of results
-- **Newspaper Name**: Daily Worker, The Worker, etc.
+- **Source Number**: Sequential numbering (Source 1, Source 2, etc.)
+- **Newspaper Name**: Daily Worker, The Worker, or other publications
 - **Relevance Score**: Percentage showing how well the content matches your search
-- **Citation**: Publication date and page information
-- **View Source Link**: Direct link to the Internet Archive page
+- **Citation**: Full citation with publication date and page information
+- **Content Excerpt**: Relevant text chunk from the newspaper
+- **View on Internet Archive**: Direct link to the original newspaper page
 
-### AI Summary
-When enabled, the AI Enhancement provides:
-- Synthesized information from top search results
-- Comprehensive answers to your questions
-- Historical context and analysis
+### AI Analysis (When Enabled)
+**Essay Generation Mode:**
+- Comprehensive synthesis of multiple sources
+- Cohesive answer to your research question
+- Sources cited as clickable [Source 1], [Source 2] references
+- Historical context and interpretation
+
+**Source Analysis Mode:**
+- Individual analysis for each source
+- Expandable sections for detailed examination
+- How each source relates to your specific question
+- Perfect for academic research and detailed citation
+
+### Download Options
+- **PDF Reports**: Professional formatting with all sources and analysis
+- **Excel Export**: Spreadsheet with source details and complete AI analysis
+- **Conversation History**: Save your entire research session
 """)
 
 st.markdown("""
 <div class="tip-box">
-<strong>Internet Archive Links:</strong> Click "View Source" to see the original newspaper page 
-on the Internet Archive website. This opens in a new tab so you don't lose your search results.
+<strong>Internet Archive Integration:</strong> All "View on Internet Archive" links open the original newspaper page 
+in a new tab. This preserves your search results while letting you examine the full historical context of each source.
 </div>
 """, unsafe_allow_html=True)
 
@@ -288,21 +353,28 @@ st.markdown("""
 ### Common Issues and Solutions
 
 **No Results Found**
-- Try broader search terms
-- Check your date range filters
-- Lower the relevance threshold
-- Switch to a different search method
+- Try broader search terms or rephrase your question
+- Check your date range filters (default covers 1924-1958)
+- Lower the relevance threshold setting
+- Use more general historical terminology
 
 **Too Many Irrelevant Results**
-- Use more specific search terms
+- Use more specific search terms or focused questions
 - Increase the relevance threshold
-- Add date range filters
-- Try keyword search for exact phrases
+- Add specific date range filters for focused periods
+- Try asking more precise questions about particular events
 
-**AI Summary Not Available**
-- Ensure GEMINI_API_KEY is configured
-- Check that AI Enhancement is enabled in Advanced Options
-- Verify you have search results to summarize
+**AI Analysis Not Working**
+- Ensure AI Enhancement is enabled in the sidebar
+- Check that you have search results to analyze
+- Try refreshing the page if the system seems unresponsive
+- Contact support if Gemini AI services appear down
+
+**Export Issues**
+- PDF download requires search results with AI analysis
+- Excel export only available in Source Analysis mode
+- Ensure pop-up blockers aren't preventing downloads
+- Check that your browser allows file downloads from the site
 """)
 
 
@@ -316,18 +388,26 @@ st.markdown("""
 st.markdown("""
 ### System Information
 - **Coverage**: Over 9,900 newspaper issues spanning 34 years (1924-1958)
-- **Content**: Daily Worker and The Worker publications
+- **Content**: Daily Worker, The Worker, and related CPUSA publications
+- **AI Model**: Gemini for analysis and synthesis
 - **Embedding Model**: multilingual-e5-large (Pinecone-hosted)
-- **Vector Database**: Pinecone with hybrid BM25 search
-- **Processing**: 350-word chunks with 75-word overlap
+- **Vector Database**: Pinecone with semantic search capabilities
+- **Processing**: 350-word chunks with 75-word overlap for optimal context
 - **Data Source**: Internet Archive historical newspapers
 
-### Search Performance
-- **Semantic Search**: Advanced AI embeddings for natural language questions
-- **Keyword Search**: BM25 algorithm for exact term matching  
-- **Hybrid Search**: Combines both methods with intelligent scoring
-- **AI Enhancement**: Gemini-powered synthesis for comprehensive answers
-- **Response Time**: Typically 2-5 seconds depending on query complexity
+### Performance & Features
+- **Semantic Search**: Advanced AI embeddings understand natural language questions
+- **Parallel Processing**: 25 concurrent operations for faster analysis
+- **Real-time Results**: Search results appear immediately while AI processes
+- **Export Formats**: PDF reports and Excel spreadsheets with complete analysis
+- **Response Modes**: Essay generation and individual source analysis
+- **Response Time**: Typically 3-8 seconds depending on complexity and analysis mode
+
+### Recent Enhancements
+- **Excel Export**: Complete source analysis in spreadsheet format
+- **Improved UI**: Streamlined interface with immediate result display
+- **Enhanced Processing**: Faster parallel analysis of multiple sources
+- **Better Integration**: Seamless Internet Archive linking and URL reconstruction
 """)
 
 # Footer

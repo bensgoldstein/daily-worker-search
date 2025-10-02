@@ -1654,8 +1654,8 @@ def main():
     </div>
     """, unsafe_allow_html=True)
     
-    # Quick navigation info
-    st.info("**New to the system?** Check the 'How to Use' page in the sidebar for search tips and examples.")
+    # Quick navigation info with hyperlink
+    st.info("**New to the system?** Check the **[How to Use](/how_to_use)** page for search tips and examples.")
     
     # Create placeholder for conversation history at the top
     conversation_history_placeholder = st.empty()
@@ -1673,7 +1673,7 @@ def main():
         
         # Add navigation link to How to Use page
         st.markdown("---")
-        st.markdown("**Need help?** See the 'How to Use' page in the sidebar for tips and examples.")
+        st.markdown("**Need help?** See the **[How to Use](/how_to_use)** page for tips and examples.")
         
         # Date range filter
         st.subheader("Date Range")
