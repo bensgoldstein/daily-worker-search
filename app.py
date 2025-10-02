@@ -470,33 +470,10 @@ def generate_full_conversation_pdf() -> BytesIO:
                     content.append(Paragraph(f"<b>Source URL:</b> <link href='{source_url}'>{source_url}</link>", styles['Normal']))
                     content.append(Spacer(1, 6))
                 
-                # Parse and format the analysis
-                import re
-                paragraphs = analysis.split('\n\n')
-                for para in paragraphs:
-                    if para.strip():
-                        # Handle markdown bold and clean for PDF
-                        para = re.sub(r'\*\*([^*]+)\*\*', r'<b>\1</b>', para)
-                        # Handle bullet points
-                        if para.strip().startswith('-') or para.strip().startswith('•'):
-                            para = f"• {para.strip()[1:].strip()}"
-                        
-                        # Escape special characters
-                        para = para.replace('&', '&amp;')
-                        para = para.replace('<b>', '|||BOLD_START|||')
-                        para = para.replace('</b>', '|||BOLD_END|||')
-                        para = para.replace('<', '&lt;').replace('>', '&gt;')
-                        para = para.replace('|||BOLD_START|||', '<b>')
-                        para = para.replace('|||BOLD_END|||', '</b>')
-                        
-                        try:
-                            content.append(Paragraph(para, styles['Normal']))
-                            content.append(Spacer(1, 6))
-                        except:
-                            # Fallback to plain text
-                            clean_para = re.sub(r'<[^>]+>', '', para)
-                            content.append(Paragraph(clean_para, styles['Normal']))
-                            content.append(Spacer(1, 6))
+                # Parse and format the analysis using the same function as single exchange PDF
+                formatted_analysis = parse_ai_response_for_pdf(analysis, styles)
+                for element in formatted_analysis:
+                    content.append(element)
                 
                 content.append(Spacer(1, 15))
             
