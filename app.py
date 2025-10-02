@@ -1555,15 +1555,6 @@ def main():
                 if not config.GEMINI_API_KEY:
                     st.warning("Source Analysis mode requires GEMINI_API_KEY in .env file")
             
-            # Context window for Source Analysis mode
-            if response_mode == "Source Analysis":
-                context_chunks = st.slider(
-                    "Context chunks on each side",
-                    min_value=1,
-                    max_value=3,
-                    value=2,
-                    help="Number of chunks before and after the main chunk to provide context"
-                )
     
     # Show conversation history if it exists
     
