@@ -458,22 +458,53 @@ def generate_full_conversation_pdf() -> BytesIO:
                 if not result or not analysis:
                     continue
                     
-                # Source header
-                header_text = f"Source {j}: {result.chunk.newspaper_metadata.newspaper_name} - {result.format_citation()}"
-                content.append(Paragraph(header_text, styles['Heading4']))
+                # Source header - escape any HTML in the text
+                import html
+                newspaper_name = html.escape(result.chunk.newspaper_metadata.newspaper_name)
+                citation = html.escape(result.format_citation())
+                header_text = f"Source {j}: {newspaper_name} - {citation}"
+                try:
+                    content.append(Paragraph(header_text, styles['Heading4']))
+                except Exception as e:
+                    # Fallback if there's still an issue
+                    logger.error(f"Error adding header paragraph: {e}")
+                    content.append(Paragraph(f"Source {j}", styles['Heading4']))
                 
                 # Add Internet Archive link if available
                 source_url = result.chunk.newspaper_metadata.source_url
                 if not source_url:
                     source_url = reconstruct_internet_archive_url(result)
                 if source_url:
-                    content.append(Paragraph(f"<b>Source URL:</b> <link href='{source_url}'>{source_url}</link>", styles['Normal']))
-                    content.append(Spacer(1, 6))
+                    try:
+                        # Escape URL for safety
+                        safe_url = html.escape(source_url, quote=False)  # Don't escape quotes in URLs
+                        content.append(Paragraph(f"<b>Source URL:</b> <link href='{safe_url}'>{safe_url}</link>", styles['Normal']))
+                        content.append(Spacer(1, 6))
+                    except Exception as e:
+                        logger.error(f"Error adding URL paragraph: {e}")
+                        # Try without link formatting
+                        try:
+                            content.append(Paragraph(f"<b>Source URL:</b> {source_url}", styles['Normal']))
+                            content.append(Spacer(1, 6))
+                        except:
+                            pass
                 
                 # Parse and format the analysis using the same function as single exchange PDF
-                formatted_analysis = parse_ai_response_for_pdf(analysis, styles)
-                for element in formatted_analysis:
-                    content.append(element)
+                try:
+                    formatted_analysis = parse_ai_response_for_pdf(analysis, styles)
+                    for element in formatted_analysis:
+                        content.append(element)
+                except Exception as e:
+                    logger.error(f"Error formatting analysis for source {j}: {e}")
+                    # Fallback - add raw text without formatting
+                    try:
+                        # Remove any HTML tags and add as plain text
+                        import re
+                        clean_analysis = re.sub(r'<[^>]+>', '', analysis)
+                        clean_analysis = html.unescape(clean_analysis)
+                        content.append(Paragraph(clean_analysis[:1000] + "...", styles['Normal']))
+                    except:
+                        content.append(Paragraph("Error displaying analysis", styles['Normal']))
                 
                 content.append(Spacer(1, 15))
             
