@@ -462,6 +462,14 @@ def generate_full_conversation_pdf() -> BytesIO:
                 header_text = f"Source {j}: {result.chunk.newspaper_metadata.newspaper_name} - {result.format_citation()}"
                 content.append(Paragraph(header_text, styles['Heading4']))
                 
+                # Add Internet Archive link if available
+                source_url = result.chunk.newspaper_metadata.source_url
+                if not source_url:
+                    source_url = reconstruct_internet_archive_url(result)
+                if source_url:
+                    content.append(Paragraph(f"<b>Source URL:</b> <link href='{source_url}'>{source_url}</link>", styles['Normal']))
+                    content.append(Spacer(1, 6))
+                
                 # Parse and format the analysis
                 import re
                 paragraphs = analysis.split('\n\n')
