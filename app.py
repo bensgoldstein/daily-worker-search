@@ -1107,32 +1107,6 @@ def reconstruct_internet_archive_url(result: SearchResult) -> Optional[str]:
         return None
 
 
-def download_bm25_index(bm25_path: Path) -> bool:
-    """Download BM25 index from Google Drive if not present."""
-    if bm25_path.exists():
-        return True
-    
-    # Google Drive file ID from the sharing link
-    file_id = "1ujeMPLPFYhIMT8xei2ZcApcNvo-gZL-A"
-    url = f"https://drive.google.com/uc?id={file_id}"
-    
-    try:
-        # Create directory if it doesn't exist
-        bm25_path.parent.mkdir(parents=True, exist_ok=True)
-        
-        with st.spinner("Downloading BM25 index (1.5GB) for keyword search capability... This is a one-time download."):
-            # Use gdown to handle Google Drive downloads
-            import gdown
-            gdown.download(url, str(bm25_path), quiet=False)
-            
-        st.success("BM25 index downloaded successfully!")
-        return True
-        
-    except Exception as e:
-        st.warning(f"Could not download BM25 index: {e}. Continuing without keyword search.")
-        logger.error(f"BM25 download error: {e}")
-        return False
-
 
 @st.cache_resource
 def initialize_vector_db():
@@ -1144,42 +1118,9 @@ def initialize_vector_db():
         # Initialize hosted vector database
         vector_db = VectorDatabaseHosted()
         
-        # Load BM25 index if available
-        # Use absolute path based on script location
-        script_dir = Path(__file__).parent
-        bm25_path = script_dir / "processed_data" / "bm25_index_hosted.pkl"
-        
-        logger.info(f"Looking for BM25 index at: {bm25_path}")
-        
-        # Skip BM25 download on cloud deployment due to memory constraints
-        # Try to download if not present and we're not on Streamlit Cloud
-        is_cloud_deployment = os.getenv('STREAMLIT_SHARING_MODE') or '/mount/src/' in str(bm25_path)
-        
-        if not bm25_path.exists() and not is_cloud_deployment:
-            logger.info("BM25 index not found locally, attempting to download...")
-            download_bm25_index(bm25_path)
-        elif is_cloud_deployment:
-            logger.info("Cloud deployment detected - skipping BM25 download due to memory constraints")
-        
-        if bm25_path.exists():
-            try:
-                logger.info(f"Loading BM25 index from: {bm25_path}")
-                # Show loading message to user
-                with st.spinner("Loading BM25 index for keyword search (this may take a moment)..."):
-                    vector_db.load_bm25_index(str(bm25_path))
-                st.success("Connected to Pinecone with full search capabilities including BM25 keyword search")
-                logger.info("BM25 index loaded successfully")
-            except MemoryError as e:
-                st.warning("BM25 index too large for available memory. Continuing with semantic search only.")
-                logger.error(f"Memory error loading BM25 index: {e}")
-            except Exception as e:
-                st.warning(f"Failed to load BM25 index: {e}. Continuing with semantic search only.")
-                logger.error(f"BM25 index loading error: {e}")
-                import traceback
-                logger.error(f"Traceback: {traceback.format_exc()}")
-        else:
-            st.info("BM25 index not available. Using semantic search only.")
-            logger.info(f"BM25 index file not found at: {bm25_path}")
+        # No longer loading BM25 index since we're using semantic search only
+        logger.info("Using semantic search only - BM25 index loading skipped")
+        st.success("Connected to Pinecone vector database")
         
         return vector_db
     except Exception as e:
