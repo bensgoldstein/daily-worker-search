@@ -29,6 +29,10 @@ processed_data/
 *.pkl
 *.pickle
 nul
+.usage_stats.json
+*.xlsx
+~$*.xlsx
+.~lock.*
 
 # Large files
 *.jpg

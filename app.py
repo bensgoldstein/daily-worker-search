@@ -1226,17 +1226,9 @@ New question: {current_query}"""
     return enhanced_query
 
 def safe_pdf_download_button(usage_monitor: UsageMonitor, **kwargs) -> bool:
-    """Wrapper for st.download_button that checks usage limits first."""
-    # Check if user can download PDF
-    if not usage_monitor.check_pdf_limit():
-        return False
-    
-    # Show the download button
-    if st.download_button(**kwargs):
-        # Record the download
-        usage_monitor.record_pdf_download()
-        return True
-    return False
+    """Wrapper for st.download_button - no longer tracks PDF downloads."""
+    # PDF downloads are no longer limited or tracked
+    return st.download_button(**kwargs)
 
 
 def get_pdf_context(result: SearchResult) -> Dict[str, Any]:
