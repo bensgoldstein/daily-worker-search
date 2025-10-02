@@ -1479,32 +1479,6 @@ def main():
                 max_value=date.today()
             )
         
-        # Search type
-        st.subheader("Search Type")
-        
-        # Check if BM25 is available
-        bm25_available = hasattr(vector_db, 'bm25') and vector_db.bm25 is not None
-        
-        if bm25_available:
-            search_options = ["Hybrid (Recommended)", "Semantic", "Keyword"]
-            help_text = """
-            - **Hybrid**: Combines semantic understanding with keyword matching
-            - **Semantic**: Finds conceptually similar content
-            - **Keyword**: Traditional keyword-based search
-            """
-        else:
-            search_options = ["Semantic (Recommended)"]
-            help_text = """
-            - **Semantic**: Finds conceptually similar content using AI embeddings
-            
-            Note: Keyword search temporarily unavailable in cloud deployment due to memory constraints.
-            """
-        
-        search_type = st.radio(
-            "Select search method",
-            search_options,
-            help=help_text
-        )
         
         # Search options
         st.subheader("Search Options")
@@ -1677,22 +1651,14 @@ def main():
             if not usage_monitor.check_cost_threshold():
                 st.stop()
             
-            # Map search type selection
-            search_type_map = {
-                "Hybrid (Recommended)": "hybrid",
-                "Semantic": "semantic",
-                "Semantic (Recommended)": "semantic",
-                "Keyword": "keyword"
-            }
-            
-            # Create search query
+            # Create search query - always use semantic search
             search_query = SearchQuery(
                 query_text=query_text,
                 start_date=start_date,
                 end_date=end_date,
                 max_results=max_results,
                 relevance_threshold=relevance_threshold,
-                search_type=search_type_map[search_type]
+                search_type="semantic"
             )
             
             # Enhance query with conversation context for AI
