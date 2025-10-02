@@ -82,9 +82,12 @@ if masthead_path.exists():
         img_base64 = base64.b64encode(img_file.read()).decode()
     masthead_img_src = f"data:image/jpeg;base64,{img_base64}"
 else:
-    # Use Google Drive hosted image for cloud deployment
+    # Use fallback approach for cloud deployment - try multiple methods
+    # Method 1: Google Drive direct link (may require public sharing)
     gdrive_file_id = "1aFE1IZ9Z3EHs5TTZ8CTJv5vFpWpOU1On"
-    masthead_img_src = f"https://drive.google.com/uc?export=view&id={gdrive_file_id}"
+    
+    # Try the thumbnail view which is more reliable for public images
+    masthead_img_src = f"https://drive.google.com/thumbnail?id={gdrive_file_id}&sz=w400"
 
 st.markdown(f"""
 <div class="main-header">
@@ -97,7 +100,13 @@ st.markdown(f"""
             <img src="{masthead_img_src}" 
                  alt="Daily Worker Masthead from January 1, 1935" 
                  style="max-height: 120px; width: auto; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.2); 
-                        object-fit: contain; object-position: top;">
+                        object-fit: contain; object-position: top;"
+                 onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+            <div style="display: none; background: rgba(255,255,255,0.1); padding: 1rem; border-radius: 8px; 
+                       text-align: center; color: #ffffff; border: 2px solid rgba(255,255,255,0.3);">
+                <strong>Daily Worker</strong><br>
+                <small>January 1, 1935</small>
+            </div>
         </div>
     </div>
 </div>
