@@ -1506,54 +1506,54 @@ def main():
             help=help_text
         )
         
-        # Advanced options
-        with st.expander("Advanced Options"):
-            max_results = st.slider(
+        # Search options
+        st.subheader("Search Options")
+        max_results = st.slider(
                 "Maximum results",
                 min_value=5,
                 max_value=50,
                 value=20,
                 step=5,
                 help="Maximum number of text chunks retrieved per search. Each chunk is a section of newspaper content that may contain part of an article or multiple short items."
-            )
-            
-            relevance_threshold = st.slider(
+        )
+        
+        relevance_threshold = st.slider(
                 "Relevance threshold",
                 min_value=0.0,
                 max_value=1.0,
                 value=0.7,
                 step=0.05,
                 help="Minimum relevance score to include results"
-            )
-            
-            # Response Mode Selection
-            st.markdown("**Response Mode**")
-            
-            response_mode = st.radio(
+        )
+        
+        # Response Mode Selection
+        st.markdown("**Response Mode**")
+        
+        response_mode = st.radio(
                 "Select how to process results",
                 ["Essay Generation", "Source Analysis"],
                 help="""
                 - **Essay Generation**: AI synthesizes all results into a comprehensive answer
                 - **Source Analysis**: AI analyzes each source individually with surrounding context
                 """
-            )
-            
-            # Only show AI enhancement option for Essay Generation mode
-            if response_mode == "Essay Generation":
-                use_ai_enhancement = st.checkbox(
+        )
+        
+        # Only show AI enhancement option for Essay Generation mode
+        if response_mode == "Essay Generation":
+            use_ai_enhancement = st.checkbox(
                     "Enhanced AI Summary (Gemini)",
                     value=True if config.GEMINI_API_KEY else False,
                     help="Use Gemini AI to synthesize search results into a comprehensive answer",
                     disabled=not config.GEMINI_API_KEY
-                )
-                
-                if not config.GEMINI_API_KEY and use_ai_enhancement:
-                    st.warning("Add GEMINI_API_KEY to .env file to enable AI summaries")
-            else:
-                # Source Analysis mode always uses AI
-                use_ai_enhancement = True
-                if not config.GEMINI_API_KEY:
-                    st.warning("Source Analysis mode requires GEMINI_API_KEY in .env file")
+            )
+            
+            if not config.GEMINI_API_KEY and use_ai_enhancement:
+                st.warning("Add GEMINI_API_KEY to .env file to enable AI summaries")
+        else:
+            # Source Analysis mode always uses AI
+            use_ai_enhancement = True
+            if not config.GEMINI_API_KEY:
+                st.warning("Source Analysis mode requires GEMINI_API_KEY in .env file")
             
     
     # Show conversation history if it exists
